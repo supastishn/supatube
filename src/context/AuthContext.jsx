@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { account } from '../lib/appwriteConfig';
+import { account, avatars } from '../lib/appwriteConfig';
 import { ID } from 'appwrite';
 
 const AuthContext = createContext();

@@ -12,6 +12,7 @@ import VideoDetail from './pages/VideoDetail';
 import Auth from './pages/Auth';
 import Upload from './pages/Upload';
 import Profile from './pages/Profile';
+import Account from './pages/Account';
 import NotFound from './pages/NotFound';
 // Placeholder pages for routes mentioned in Sidebar
 const Trending = () => <div>Trending Page</div>;
@@ -108,6 +109,13 @@ function App() {
             <Route path="/profile/:userId" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+
+            {/* Add Account Page Route */}
+            <Route path="/account" element={
+              <ProtectedRoute>
+                <Account />
               </ProtectedRoute>
             } />
 

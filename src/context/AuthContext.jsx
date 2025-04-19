@@ -14,13 +14,22 @@ export const AuthProvider = ({ children }) => {
     checkUserStatus();
   }, []);
 
-  // Check if user is logged in
+  // Check if user is logged in and fetch preferences
   const checkUserStatus = async () => {
+    setLoading(true); // Ensure loading is true at the start
     try {
       const currentAccount = await account.get();
-      setUser(currentAccount);
+      const currentPrefs = await account.getPrefs(); // Fetch preferences
+      setUser({ ...currentAccount, prefs: currentPrefs }); // Merge account and prefs
+      console.log("User status checked, user:", { ...currentAccount, prefs: currentPrefs });
     } catch (error) {
-      console.log("User is not logged in");
+      // Only log error if it's not the expected "not logged in" error (401)
+      if (error.code !== 401) {
+         console.error("Check user status error:", error);
+      } else {
+         console.log("User is not logged in");
+      }
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -73,6 +82,21 @@ export const AuthProvider = ({ children }) => {
     return avatars.getInitials(userId || (user ? user.$id : "Guest"));
   };
 
+  // Function to manually refresh user data + prefs after an update
+  const updateUserProfile = async () => {
+    try {
+      const currentAccount = await account.get();
+      const currentPrefs = await account.getPrefs();
+      setUser({ ...currentAccount, prefs: currentPrefs });
+      console.log("User profile updated in context.");
+      return { ...currentAccount, prefs: currentPrefs }; // Return updated user object
+    } catch (error) {
+      console.error("Failed to refresh user profile:", error);
+      // Optionally handle logout or error display if fetching fails critically
+      return null;
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -80,7 +104,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     getAvatarUrl,
-    checkUserStatus
+    checkUserStatus,
+    updateUserProfile,
+    account,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

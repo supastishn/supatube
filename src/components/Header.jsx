@@ -91,6 +91,8 @@ const Header = ({ toggleSidebar, isMobile }) => {
                   <div className="dropdown-divider"></div>
                   <Link to={`/profile/${user?.$id}`} className="dropdown-item">Your channel</Link>
                   <Link to="/your-videos" className="dropdown-item">Your videos</Link>
+                  <Link to="/account" className="dropdown-item">Account Settings</Link>
+                  <div className="dropdown-divider"></div>
                   <button onClick={logout} className="dropdown-item">Sign out</button>
                 </div>
               </div>

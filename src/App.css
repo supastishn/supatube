@@ -1,8 +1,416 @@
-/* Add base styles for App.jsx layout here */
+/* Main layout */
 .app-container {
-  /* Example */
   min-height: 100vh;
-  /* Add more styles for layout, header, sidebar etc. as needed */
+  display: flex;
+  flex-direction: column;
 }
 
-/* Add component-specific styles later */
+.content-container {
+  display: flex;
+  flex: 1;
+  margin-top: var(--header-height);
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  padding-left: calc(var(--sidebar-width) + 24px);
+  transition: padding-left 0.3s;
+  background-color: var(--light-gray); /* Added light background */
+  min-height: calc(100vh - var(--header-height)); /* Ensure it fills height */
+}
+
+.main-content.sidebar-collapsed {
+  padding-left: calc(var(--sidebar-collapsed-width) + 24px);
+}
+
+/* Video grid layout */
+.videos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding-bottom: 40px;
+}
+
+/* Video detail page */
+.video-detail-container {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); /* Adjusted for flexibility */
+  gap: 24px;
+  padding-bottom: 40px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.video-player-container {
+  position: relative;
+  padding-top: 56.25%; /* 16:9 Aspect Ratio */
+  background-color: var(--dark);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px; /* Reduced margin */
+}
+
+.video-info {
+  margin-bottom: 16px; /* Reduced margin */
+}
+
+.video-title {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.video-stats-actions {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px; /* Added gap */
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--light-gray);
+}
+
+.video-views {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.video-actions {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping */
+  gap: 8px; /* Reduced gap */
+}
+
+.video-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px; /* Adjusted padding */
+  border-radius: 18px;
+  background-color: var(--light-gray);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.video-action-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.video-action-btn svg {
+    fill: var(--text-secondary);
+}
+
+/* Channel Info styles */
+.channel-info {
+    margin-top: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.channel-header {
+    display: flex;
+    align-items: flex-start; /* Align items to top */
+    margin-bottom: 12px; /* Reduced margin */
+    gap: 16px;
+}
+
+.channel-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.channel-details {
+    flex: 1;
+    min-width: 0; /* Prevent overflow */
+}
+
+.channel-name {
+    font-weight: 500;
+    margin-bottom: 2px; /* Reduced margin */
+}
+
+.channel-subscribers {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.subscribe-btn {
+    background-color: var(--dark);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 18px; /* Rounded button */
+    font-weight: 500;
+    text-transform: capitalize; /* Changed case */
+    margin-left: auto; /* Push button to right */
+    height: fit-content; /* Fit height */
+    transition: background-color 0.2s;
+}
+
+.subscribe-btn:hover {
+    background-color: var(--dark-light);
+}
+
+.video-description {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap; /* Changed to wrap */
+    background-color: var(--light-gray);
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+/* Related Videos */
+.related-videos {
+    /* Styles for related videos sidebar */
+}
+
+.related-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+.related-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px; /* Increased gap */
+}
+
+.related-video-card {
+    display: flex;
+    gap: 8px;
+}
+
+.related-video-card .thumbnail-container {
+    width: 168px; /* Fixed width */
+    padding-top: 94px; /* Approx 16:9 */
+    flex-shrink: 0;
+    border-radius: 8px;
+}
+
+.related-video-card .video-info {
+    padding-top: 0;
+    gap: 8px;
+}
+
+.related-video-card .channel-avatar {
+    display: none; /* Hide avatar in related list */
+}
+
+.related-video-card .video-title {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+}
+
+.related-video-card .channel-name,
+.related-video-card .video-stats {
+    font-size: 12px;
+}
+
+
+/* Authentication pages */
+.auth-container {
+  max-width: 400px; /* Reduced max width */
+  margin: 60px auto; /* Increased top margin */
+  padding: 30px;
+  background-color: var(--white);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.auth-title {
+  text-align: center;
+  margin-bottom: 24px;
+  font-size: 24px;
+  font-weight: 500; /* Added weight */
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Increased gap */
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* Reduced gap */
+}
+
+.form-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-input {
+  padding: 12px;
+  border: 1px solid #ccc; /* Lighter border */
+  border-radius: 4px;
+  font-size: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--white);
+  padding: 12px;
+  border-radius: 18px; /* Rounded button */
+  font-weight: 500;
+  font-size: 16px;
+  text-align: center;
+  transition: background-color 0.2s;
+  margin-top: 8px; /* Added margin */
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-light);
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: 20px; /* Increased margin */
+  font-size: 14px; /* Adjusted size */
+  color: var(--text-secondary);
+}
+
+.auth-switch a {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* 404 Page */
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - var(--header-height) - 48px); /* Adjusted height considering padding */
+  text-align: center;
+  padding: 0 20px;
+}
+
+.not-found h1 {
+  font-size: 100px; /* Increased size */
+  color: var(--primary);
+  margin-bottom: 16px; /* Added margin */
+}
+
+.not-found p {
+  font-size: 20px;
+  color: var(--text-secondary);
+  margin-bottom: 32px; /* Increased margin */
+}
+
+.not-found .btn-primary {
+  display: inline-block;
+  min-width: 150px; /* Increased width */
+}
+
+/* Responsive styles */
+@media (max-width: 1200px) {
+  .videos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .video-detail-container {
+      grid-template-columns: minmax(0, 1fr); /* Single column */
+  }
+  .related-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+  }
+  .related-video-card {
+      flex-direction: column; /* Stack elements vertically */
+  }
+  .related-video-card .thumbnail-container {
+      width: 100%; /* Full width */
+      padding-top: 56.25%; /* Maintain aspect ratio */
+  }
+  .related-video-card .video-info {
+      padding-top: 8px; /* Add padding */
+  }
+}
+
+@media (max-width: 768px) {
+  /* Collapse sidebar by default and adjust padding */
+  .main-content {
+    padding: 16px;
+    padding-left: calc(var(--sidebar-collapsed-width) + 16px);
+  }
+  .main-content.sidebar-collapsed {
+    padding-left: calc(var(--sidebar-collapsed-width) + 16px);
+  }
+  
+  /* Force collapsed state visually when sidebar is "open" on mobile */
+  .main-content.sidebar-open-mobile {
+     padding-left: calc(var(--sidebar-collapsed-width) + 16px);
+  }
+
+  .videos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  
+  .video-stats-actions {
+      flex-direction: column;
+      align-items: flex-start;
+  }
+  
+  .channel-header {
+      align-items: center; /* Center align on smaller screens */
+  }
+  
+  .subscribe-btn {
+      margin-left: 0; /* Remove margin */
+      margin-top: 8px; /* Add top margin */
+  }
+
+  .auth-container {
+      width: 90%;
+      margin: 40px auto;
+  }
+}
+
+@media (max-width: 576px) {
+  .main-content,
+  .main-content.sidebar-collapsed,
+  .main-content.sidebar-open-mobile {
+      padding: 12px; /* Reduce padding further */
+      padding-left: 12px; /* No extra space needed for collapsed sidebar */
+  }
+
+  .videos-grid {
+    grid-template-columns: 1fr; /* Single column */
+    gap: 20px; /* Increased gap */
+  }
+
+  .video-title {
+      font-size: 18px;
+  }
+  
+  .video-action-btn {
+      padding: 6px 10px;
+      font-size: 13px;
+  }
+  
+  .not-found h1 {
+      font-size: 80px;
+  }
+  
+  .not-found p {
+      font-size: 18px;
+  }
+}

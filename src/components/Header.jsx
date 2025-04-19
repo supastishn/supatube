@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ toggleSidebar, isMobile }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  // Placeholder for authentication state - replace with actual context/state
-  const isLoggedIn = false; // Change this based on user auth status
+  const isLoggedIn = !!user;
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -66,16 +67,33 @@ const Header = ({ toggleSidebar, isMobile }) => {
                 <path d="M14,13h-3v3H9v-3H6v-2h3V8h2v3h3V13z M17,6H3v12h14v-6.39l4,1.83V8.56l-4,1.83V6 M18,5v3.83L22,7v8l-4-1.83V19H2V5H18L18,5 z"></path>
               </svg>
             </Link>
+            
             {/* User Avatar (visible if logged in) */}
             <div className="user-avatar">
-              <Link to="/profile/me" aria-label="User Profile"> {/* Update 'me' with actual user ID */}
+              <div className="avatar-dropdown">
                 <img
-                  src="https://i.pravatar.cc/32" // Replace with actual user avatar URL
+                  src={`https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
                   alt="User avatar"
                   className="avatar-img"
                 />
-              </Link>
-              {/* TODO: Add dropdown menu for avatar click */}
+                <div className="dropdown-menu">
+                  <div className="dropdown-header">
+                    <img 
+                      src={`https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`} 
+                      alt="User" 
+                      className="dropdown-avatar" 
+                    />
+                    <div className="user-info">
+                      <span className="user-name">{user?.name || 'User'}</span>
+                      <span className="user-email">{user?.email}</span>
+                    </div>
+                  </div>
+                  <div className="dropdown-divider"></div>
+                  <Link to={`/profile/${user?.$id}`} className="dropdown-item">Your channel</Link>
+                  <Link to="/your-videos" className="dropdown-item">Your videos</Link>
+                  <button onClick={logout} className="dropdown-item">Sign out</button>
+                </div>
+              </div>
             </div>
           </>
         ) : (
@@ -198,6 +216,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
           border-radius: 50%;
           overflow: hidden;
           cursor: pointer; /* Indicate clickable */
+          position: relative;
         }
 
         .avatar-img {
@@ -205,7 +224,78 @@ const Header = ({ toggleSidebar, isMobile }) => {
           height: 100%;
           object-fit: cover;
         }
-
+        
+        .avatar-dropdown {
+          position: relative;
+        }
+        
+        .avatar-dropdown:hover .dropdown-menu {
+          display: block;
+        }
+        
+        .dropdown-menu {
+          display: none;
+          position: absolute;
+          right: 0;
+          top: 40px;
+          min-width: 240px;
+          background-color: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          z-index: 1000;
+          overflow: hidden;
+        }
+        
+        .dropdown-header {
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          border-bottom: 1px solid #eee;
+        }
+        
+        .dropdown-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          margin-right: 12px;
+        }
+        
+        .user-info {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .user-name {
+          font-weight: 500;
+        }
+        
+        .user-email {
+          font-size: 14px;
+          color: #606060;
+        }
+        
+        .dropdown-divider {
+          height: 1px;
+          background-color: #eee;
+        }
+        
+        .dropdown-item {
+          padding: 12px 16px;
+          display: block;
+          text-decoration: none;
+          color: #030303;
+          font-size: 14px;
+          cursor: pointer;
+          border: none;
+          background: none;
+          width: 100%;
+          text-align: left;
+        }
+        
+        .dropdown-item:hover {
+          background-color: #f2f2f2;
+        }
+        
         /* Responsive adjustments */
         @media (max-width: 768px) {
           .search-form {

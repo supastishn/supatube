@@ -1,36 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-
-// Placeholder for authentication logic - replace with your actual context/API calls
-const fakeAuth = {
-  signin: async (email, password) => {
-    console.log('Signing in with:', email, password);
-    await new Promise(res => setTimeout(res, 500)); // Simulate API call
-    // Simulate success/failure
-    if (email === 'user@example.com' && password === 'password') {
-      return { success: true, user: { id: '123', email } };
-    } else {
-      throw new Error('Invalid credentials');
-    }
-  },
-  signup: async (email, password) => {
-    console.log('Signing up with:', email, password);
-    await new Promise(res => setTimeout(res, 500)); // Simulate API call
-    // Simulate success/failure (e.g., email already exists)
-    if (email === 'existing@example.com') {
-       throw new Error('Email already in use');
-    }
-    return { success: true, user: { id: '456', email } };
-  }
-};
-
+import { useAuth } from '../context/AuthContext';
 
 const Auth = ({ type }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSignin = type === 'signin';
+  const { login, register } = useAuth();
 
-  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({ 
+    email: '', 
+    password: '', 
+    confirmPassword: '',
+    name: '' 
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +26,7 @@ const Auth = ({ type }) => {
     setError(''); // Clear previous errors
     setLoading(true);
 
-    const { email, password, confirmPassword } = formData;
+    const { email, password, confirmPassword, name } = formData;
 
     // Basic validation
     if (!email || !password) {
@@ -51,6 +34,7 @@ const Auth = ({ type }) => {
       setLoading(false);
       return;
     }
+    
     if (!isSignin && password !== confirmPassword) {
       setError('Passwords do not match.');
       setLoading(false);
@@ -59,21 +43,25 @@ const Auth = ({ type }) => {
 
     try {
       if (isSignin) {
-        await fakeAuth.signin(email, password);
-        // TODO: Update global auth state (Context API, Redux, Zustand, etc.)
-        console.log('Sign in successful!');
+        await login(email, password);
         // Redirect to previous page or home
         const from = location.state?.from?.pathname || "/";
         navigate(from, { replace: true });
       } else {
-        await fakeAuth.signup(email, password);
-        // TODO: Update global auth state
-        console.log('Sign up successful!');
-        // Redirect to home or profile setup page
+        await register(email, password, name);
+        // Redirect to home after successful registration and auto-login
         navigate('/');
       }
     } catch (err) {
-      setError(err.message || `Failed to ${isSignin ? 'sign in' : 'sign up'}. Please try again.`);
+      console.error("Auth error:", err);
+      // Handle specific Appwrite errors with more user-friendly messages
+      if (err.code === 400) {
+        setError('Invalid email or password');
+      } else if (err.code === 409) {
+        setError('An account with this email already exists');
+      } else {
+        setError(err.message || `Failed to ${isSignin ? 'sign in' : 'sign up'}. Please try again.`);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,6 +74,22 @@ const Auth = ({ type }) => {
       {error && <p className="auth-error">{error}</p>}
 
       <form className="auth-form" onSubmit={handleSubmit}>
+        {!isSignin && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="name">Name</label>
+            <input
+              className="form-input"
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              aria-label="Name"
+              placeholder="Your display name"
+            />
+          </div>
+        )}
         <div className="form-group">
           <label className="form-label" htmlFor="email">Email</label>
           <input
@@ -145,6 +149,57 @@ const Auth = ({ type }) => {
       </div>
       {/* Inline styles specific to Auth page */}
       <style jsx>{`
+        .auth-container {
+          max-width: 480px;
+          margin: 100px auto;
+          padding: 32px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          background-color: #fff;
+        }
+        .auth-title {
+          margin-bottom: 24px;
+          text-align: center;
+          color: #202020;
+        }
+        .auth-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .form-label {
+          font-weight: 500;
+          font-size: 14px;
+        }
+        .form-input {
+          padding: 12px;
+          border-radius: 4px;
+          border: 1px solid #ddd;
+          font-size: 16px;
+        }
+        .form-input:focus {
+          border-color: #1a73e8;
+          outline: none;
+        }
+        .btn-primary {
+          padding: 12px;
+          background-color: #1a73e8;
+          color: white;
+          font-weight: 500;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 16px;
+          margin-top: 8px;
+        }
+        .btn-primary:hover {
+          background-color: #1565C0;
+        }
         .auth-error {
             background-color: #ffebee; /* Light red background */
             color: #c62828; /* Darker red text */
@@ -158,6 +213,19 @@ const Auth = ({ type }) => {
         .btn-primary[disabled] {
             background-color: var(--gray);
             cursor: not-allowed;
+        }
+        .auth-switch {
+          margin-top: 24px;
+          text-align: center;
+          font-size: 14px;
+        }
+        .auth-switch a {
+          color: #1a73e8;
+          text-decoration: none;
+          font-weight: 500;
+        }
+        .auth-switch a:hover {
+          text-decoration: underline;
         }
       `}</style>
     </div>

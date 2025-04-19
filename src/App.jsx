@@ -5,6 +5,7 @@ import './App.css';
 // Importing components
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import ProtectedRoute from './components/ProtectedRoute';
 // Importing pages (Make sure these files exist in src/pages/)
 import Home from './pages/Home';
 import VideoDetail from './pages/VideoDetail';
@@ -99,16 +100,44 @@ function App() {
             {/* Core Content Routes */}
             <Route index element={<Home />} />
             <Route path="/videos/:id" element={<VideoDetail />} />
-            <Route path="/upload" element={<Upload />} />
-            <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/upload" element={
+              <ProtectedRoute>
+                <Upload />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile/:userId" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
 
-            {/* Additional Routes from Sidebar */}
+            {/* Additional Protected Routes from Sidebar */}
             <Route path="/trending" element={<Trending />} />
-            <Route path="/subscriptions" element={<Subscriptions />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/your-videos" element={<YourVideos />} />
-            <Route path="/playlist" element={<WatchLater />} /> {/* Simplified, adjust if needed */}
-            <Route path="/liked-videos" element={<LikedVideos />} />
+            <Route path="/subscriptions" element={
+              <ProtectedRoute>
+                <Subscriptions />
+              </ProtectedRoute>
+            } />
+            <Route path="/history" element={
+              <ProtectedRoute>
+                <History />
+              </ProtectedRoute>
+            } />
+            <Route path="/your-videos" element={
+              <ProtectedRoute>
+                <YourVideos />
+              </ProtectedRoute>
+            } />
+            <Route path="/playlist" element={
+              <ProtectedRoute>
+                <WatchLater />
+              </ProtectedRoute>
+            } />
+            <Route path="/liked-videos" element={
+              <ProtectedRoute>
+                <LikedVideos />
+              </ProtectedRoute>
+            } />
 
             {/* Catch All 404 Route */}
             <Route path="*" element={<NotFound />} />

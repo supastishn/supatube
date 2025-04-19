@@ -71,11 +71,13 @@ const Header = ({ toggleSidebar, isMobile }) => {
             {/* User Avatar (visible if logged in) */}
             <div className="user-avatar">
               <div className="avatar-dropdown">
-                <img
-                  src={`https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
-                  alt="User avatar"
-                  className="avatar-img"
-                />
+                <Link to="/account" aria-label="Account Settings">
+                  <img
+                    src={`https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
+                    alt="User avatar"
+                    className="avatar-img"
+                  />
+                </Link>
                 <div className="dropdown-menu">
                   <div className="dropdown-header">
                     <img 

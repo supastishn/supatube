@@ -3,7 +3,9 @@ import { Client, Account, Databases, Storage, Avatars } from 'appwrite';
 export const appwriteConfig = {
     endpoint: 'https://fra.cloud.appwrite.io/v1',
     projectId: 'supatube',
-    // Add other IDs if needed later (e.g., databaseId, storageId, collectionIds)
+    databaseId: 'database',                  // Database ID
+    videosCollectionId: 'videos',            // Videos collection ID
+    storageVideosBucketId: 'videos',         // Videos storage bucket ID
 };
 
 // Initialize Appwrite client

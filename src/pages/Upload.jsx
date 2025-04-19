@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { databases, storage, ID } from '../lib/appwriteConfig'; // Import Appwrite services and ID
+import { databases, storage } from '../lib/appwriteConfig'; // Import Appwrite services
+import { ID } from 'appwrite';                             // Import ID directly from 'appwrite'
 import { appwriteConfig } from '../lib/appwriteConfig'; // Import config for IDs
 
 const Upload = () => {

@@ -79,13 +79,13 @@ const VideoDetail = () => {
         }
 
         // --- Use Thumbnail URL ---
-        // Use the URL stored directly in the document attribute 'thumbnailUrl'
-        console.log(`[DetailThumb/${videoId}] Checking doc.thumbnailUrl:`, doc.thumbnailUrl); // Log the attribute value
-        // Adjust 'doc.thumbnailUrl' if your attribute name is different
+        // Use the URL stored directly in the document attribute 'thumnbail_url'
+        console.log(`[DetailThumb/${videoId}] Checking doc.thumnbail_url:`, doc.thumnbail_url); // Log the correct attribute value
+        // Use the correct attribute name 'doc.thumnbail_url'
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
-        if (doc.thumbnailUrl) {
-           console.log(`[DetailThumb/${videoId}] Using doc.thumbnailUrl.`);
-           thumbnailUrl = doc.thumbnailUrl;
+        if (doc.thumnbail_url) {
+           console.log(`[DetailThumb/${videoId}] Using doc.thumnbail_url.`);
+           thumbnailUrl = doc.thumnbail_url;
         } else {
             console.log(`[DetailThumb/${videoId}] Using fallback thumbnail.`);
         }

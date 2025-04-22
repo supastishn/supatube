@@ -151,8 +151,14 @@ const VideoDetail = () => {
 
         // Final Avatar Fallback: Generate initials if no URL was found
         if (!channelAvatarUrl) {
-            // Generate initials based on the best available identifier
-            const initialBase = creatorName !== 'Unknown Channel' ? creatorName : (creatorId || '?');
+            let initialBase;
+            if (creatorName !== 'Unknown Channel') {
+                initialBase = creatorName; // Use name if available
+            } else if (creatorId) {
+                initialBase = creatorId; // Fallback to creatorId if name is unknown but ID exists
+            } else {
+                initialBase = '?'; // Last resort if both name and ID are unknown
+            }
             channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
             console.log("Generating avatar from initials using base:", initialBase);
         }

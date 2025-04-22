@@ -60,30 +60,6 @@ const Home = () => {
         {/* You can use a more sophisticated spinner/skeleton loader here */}
         <div className="loading-spinner"></div>
         <p>Loading videos...</p>
-        <style jsx>{`
-          .loading-container {
-            display: flex;
-            flex-direction: column; /* Stack spinner and text */
-            justify-content: center;
-            align-items: center;
-            min-height: calc(100vh - var(--header-height) - 48px); /* Fill available height */
-            text-align: center;
-            color: var(--text-secondary);
-          }
-          .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--light-gray);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 16px; /* Space between spinner and text */
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -96,24 +72,6 @@ const Home = () => {
         <p>{error}</p>
         {/* Optionally add a retry button */}
         {/* <button onClick={fetchVideos}>Try Again</button> */}
-        <style jsx>{`
-          .error-container {
-            padding: 40px 20px;
-            text-align: center;
-            color: var(--primary);
-            background-color: #fff0f0; /* Light red background */
-            border: 1px solid var(--primary-light);
-            border-radius: 8px;
-            margin: 20px;
-          }
-          .error-container h2 {
-            margin-bottom: 10px;
-          }
-          .error-container p {
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-          }
-        `}</style>
       </div>
     );
   }

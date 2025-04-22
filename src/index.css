@@ -58,3 +58,48 @@ button {
   background-color: var(--gray);
   border-radius: 20px;
 }
+
+/* === Styles moved from Home.jsx === */
+
+/* Loading State Styles */
+.loading-container {
+  display: flex;
+  flex-direction: column; /* Stack spinner and text */
+  justify-content: center;
+  align-items: center;
+  /* Adjust min-height calculation if needed based on actual layout */
+  min-height: calc(100vh - var(--header-height) - 48px);
+  text-align: center;
+  color: var(--text-secondary);
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--light-gray);
+  border-top: 4px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px; /* Space between spinner and text */
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error State Styles */
+.error-container {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--primary);
+  background-color: #fff0f0; /* Light red background */
+  border: 1px solid var(--primary-light);
+  border-radius: 8px;
+  margin: 20px; /* Add margin around the error box */
+}
+.error-container h2 {
+  margin-bottom: 10px;
+}
+.error-container p {
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}

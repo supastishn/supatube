@@ -57,8 +57,9 @@ const VideoDetail = () => {
 
         // --- Get Creator/Channel Info ---
         // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)
-        // is denormalized and stored within the video document during upload.
+        // is denormalized and stored *within* the video document itself.
         // Client-side fetching of arbitrary user details by ID is generally restricted.
+        // --> We rely on the 'creatorId' attribute being correctly set on the document during upload. <--
 
         // --- Generate Video URL from Storage (using 'video_id') ---
         let videoStreamUrl = '';
@@ -117,11 +118,12 @@ const VideoDetail = () => {
           uploadedAt: doc.$createdAt,    // Use Appwrite's creation timestamp
           channel: {
             // Adjust attribute names based on your Appwrite collection schema
-            id: doc.channelId || `channel-${doc.$id}`, // Use 'channelId' if available
+            id: doc.channelId || (creatorId ? `user-${creatorId}` : `channel-${doc.$id}`), // Prioritize creatorId for fallback ID
             name: creatorName, // Use extracted name
             subscriberCount: doc.subscriberCount || 0, // Use denormalized count
             profileImageUrl: channelAvatarUrl, // Use determined avatar URL
-          }
+            creatorUserId: creatorId // Explicitly store the creator's User ID
+          },
           // Add other fields from 'doc' as needed
         };
 

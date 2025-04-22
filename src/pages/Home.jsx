@@ -33,11 +33,11 @@ const Home = () => {
           let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
           console.log(`Checking doc ${doc.$id}...`);
           if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
-            console.log(`Found thumbnailFileId for ${doc.$id}: ${doc.thumbnailFileId}`);
+            console.log(`Found thumbnail_id for ${doc.$id}: ${doc.thumbnail_id}`);
             try {
               thumbnailUrl = storage.getFilePreview(
                 appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
-                doc.thumbnailFileId                 // The attribute holding the thumbnail's File ID
+                doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
               ).href; // Get the URL string from the URL object
             console.log(`Generated thumbnail URL for ${doc.$id}: ${thumbnailUrl}`);
             } catch (previewError) {

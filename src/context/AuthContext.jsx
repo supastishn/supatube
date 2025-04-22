@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Register new user
-  const register = async (email, password, name) => {
+  const register = async (email, password, name, profileImageUrl) => { // Add profileImageUrl parameter
     try {
       const response = await account.create(
         ID.unique(),
@@ -47,7 +47,19 @@ export const AuthProvider = ({ children }) => {
 
       if (response) {
         // Log in the user immediately after registration
-        await login(email, password);
+        const loggedInUser = await login(email, password); // login sets the user state internally
+
+        // If profileImageUrl was provided, update preferences
+        if (loggedInUser && profileImageUrl && profileImageUrl.trim()) {
+           try {
+             await account.updatePrefs({ profileImageUrl: profileImageUrl.trim() });
+             console.log("Profile Image URL saved to preferences during registration.");
+             await updateUserProfile(); // Refresh context user to include the new pref
+           } catch (prefsError) {
+             console.error("Error saving profile image URL pref during registration:", prefsError);
+             // Registration succeeded, but pref update failed. User is logged in.
+           }
+        }
       }
     } catch (error) {
       throw error;

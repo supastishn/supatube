@@ -5,6 +5,7 @@ const Account = () => {
   const { user, account, updateUserProfile } = useAuth(); // Get user, account obj, and update function
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -15,6 +16,7 @@ const Account = () => {
       setName(user.name || '');
       // Preferences are nested under 'prefs' object we added in context
       setDescription(user.prefs?.description || '');
+      setProfileImageUrl(user.prefs?.profileImageUrl || ''); // Populate profile image URL from prefs
     }
   }, [user]); // Re-run effect if user object changes
 
@@ -24,20 +26,27 @@ const Account = () => {
     setError('');
     setSuccess('');
 
+    let profileUpdated = false; // Flag to track if anything was updated
+
     try {
       // Update name if it has changed
       if (name !== user.name) {
         await account.updateName(name);
         console.log("Name updated successfully");
+        profileUpdated = true;
       }
 
-      // Update preferences (description) if it has changed
+      // Update preferences (description, profileImageUrl) if they have changed
       // Fetch current prefs first to avoid overwriting others if they exist
       const currentPrefs = await account.getPrefs();
-      if (description !== (currentPrefs?.description || '')) {
+      const descriptionChanged = description !== (currentPrefs?.description || '');
+      const imageUrlChanged = profileImageUrl !== (currentPrefs?.profileImageUrl || '');
+
+      if (descriptionChanged || imageUrlChanged) {
           await account.updatePrefs({
             ...currentPrefs, // Keep existing preferences
-            description: description // Update/add description
+            description: description, // Update/add description
+            profileImageUrl: profileImageUrl // Update/add profileImageUrl
           });
           console.log("Preferences updated successfully");
       }
@@ -45,7 +54,9 @@ const Account = () => {
       // Refresh the user state in the context
       await updateUserProfile();
 
-      setSuccess('Account updated successfully!');
+      if (profileUpdated || descriptionChanged || imageUrlChanged) {
+          setSuccess('Account updated successfully!');
+      } // Only show success if something actually changed
 
     } catch (err) {
       console.error("Account update error:", err);
@@ -105,6 +116,19 @@ const Account = () => {
           />
         </div>
 
+        <div className="form-group">
+          <label htmlFor="profileImageUrl">Profile Image URL</label>
+          <input
+            type="url"
+            id="profileImageUrl"
+            value={profileImageUrl}
+            onChange={(e) => setProfileImageUrl(e.target.value)}
+            placeholder="https://example.com/your-avatar.jpg"
+            className="form-input"
+          />
+          <small>Provide a URL to your desired profile picture.</small>
+        </div>
+
         <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
@@ -138,6 +162,10 @@ const Account = () => {
           border: 1px solid #ccc;
           border-radius: 4px;
           font-size: 1rem;
+        }
+        .form-group small {
+            font-size: 0.8rem;
+            color: #606060;
         }
         .form-input.disabled {
           background-color: #f0f0f0;

@@ -12,7 +12,8 @@ const Auth = ({ type }) => {
     email: '', 
     password: '', 
     confirmPassword: '',
-    name: '' 
+    name: '',
+    profileImageUrl: '' // Add profile image URL state
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,7 @@ const Auth = ({ type }) => {
     setError(''); // Clear previous errors
     setLoading(true);
 
-    const { email, password, confirmPassword, name } = formData;
+    const { email, password, confirmPassword, name, profileImageUrl } = formData; // Destructure profileImageUrl
 
     // Basic validation
     if (!email || !password) {
@@ -48,7 +49,7 @@ const Auth = ({ type }) => {
         const from = location.state?.from?.pathname || "/";
         navigate(from, { replace: true });
       } else {
-        await register(email, password, name);
+        await register(email, password, name, profileImageUrl); // Pass profileImageUrl
         // Redirect to home after successful registration and auto-login
         navigate('/');
       }
@@ -87,6 +88,22 @@ const Auth = ({ type }) => {
               required
               aria-label="Name"
               placeholder="Your display name"
+            />
+          </div>
+        )}
+        {/* Add Profile Image URL input only for Sign Up */}
+        {!isSignin && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="profileImageUrl">Profile Image URL (Optional)</label>
+            <input
+              className="form-input"
+              type="url" // Use type="url" for better semantics/validation
+              id="profileImageUrl"
+              name="profileImageUrl"
+              value={formData.profileImageUrl}
+              onChange={handleChange}
+              aria-label="Profile Image URL"
+              placeholder="https://example.com/avatar.png"
             />
           </div>
         )}

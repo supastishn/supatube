@@ -21,13 +21,12 @@ export const AuthProvider = ({ children }) => {
       const currentAccount = await account.get();
       const currentPrefs = await account.getPrefs(); // Fetch preferences
       setUser({ ...currentAccount, prefs: currentPrefs }); // Merge account and prefs
-      console.log("User status checked, user:", { ...currentAccount, prefs: currentPrefs });
     } catch (error) {
       // Only log error if it's not the expected "not logged in" error (401)
       if (error.code !== 401) {
-         console.error("Check user status error:", error);
+         // Not logged in error
       } else {
-         console.log("User is not logged in");
+         // User is not logged in
       }
       setUser(null);
     } finally {
@@ -53,10 +52,9 @@ export const AuthProvider = ({ children }) => {
         if (loggedInUser && profileImageUrl && profileImageUrl.trim()) {
            try {
              await account.updatePrefs({ profileImageUrl: profileImageUrl.trim() });
-             console.log("Profile Image URL saved to preferences during registration.");
              await updateUserProfile(); // Refresh context user to include the new pref
            } catch (prefsError) {
-             console.error("Error saving profile image URL pref during registration:", prefsError);
+             // Error saving profile image URL pref
              // Registration succeeded, but pref update failed. User is logged in.
            }
         }
@@ -85,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       navigate('/sign-in');
     } catch (error) {
-      console.error("Logout error:", error);
+      // Logout error
     }
   };
 
@@ -100,10 +98,9 @@ export const AuthProvider = ({ children }) => {
       const currentAccount = await account.get();
       const currentPrefs = await account.getPrefs();
       setUser({ ...currentAccount, prefs: currentPrefs });
-      console.log("User profile updated in context.");
       return { ...currentAccount, prefs: currentPrefs }; // Return updated user object
     } catch (error) {
-      console.error("Failed to refresh user profile:", error);
+      // Failed to refresh user profile
       // Optionally handle logout or error display if fetching fails critically
       return null;
     }

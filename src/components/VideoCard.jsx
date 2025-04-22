@@ -31,7 +31,6 @@ const formatTimeAgo = (dateString) => {
     try {
         return formatDistanceToNowStrict(new Date(dateString), { addSuffix: true });
     } catch (e) {
-        console.error("Error formatting date:", e);
         return "some time ago"; // Fallback
     }
 }
@@ -70,6 +69,8 @@ const VideoCard = ({ video, isRelated = false }) => {
       profileImageUrl, // Channel Avatar URL
       creatorUserId // Creator's user ID from permissions
   } = channel || defaultVideo.channel;
+  
+  console.log('VideoCard Channel ID:', channelId);
 
   // Determine card layout based on context (e.g., grid vs. list/related)
   const cardLayoutClass = isRelated ? 'related-layout' : 'grid-layout';

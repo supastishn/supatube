@@ -10,7 +10,6 @@ const Home = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('ee')
     const fetchVideos = async () => {
       setLoading(true);
       setError(null); // Reset error state
@@ -22,12 +21,9 @@ const Home = () => {
           [Query.orderDesc('$createdAt')] // Example: Order by creation date, newest first
         );
 
-        console.log('Raw Appwrite Response:', response); // Log the raw response object
-
         // Map Appwrite documents to the video structure expected by VideoCard
         // IMPORTANT: Adjust the attribute names (e.g., doc.thumbnailUrl, doc.channelName)
         // to match YOUR Appwrite collection schema EXACTLY.
-        console.log('Documents before map:', response.documents);
         const fetchedVideos = response.documents.map(doc => {
           // --- Extract Creator ID from Permissions ---
           let creatorId = null;
@@ -38,7 +34,6 @@ const Home = () => {
               const match = perm.match(deletePermissionRegex);
               if (match && match[1]) {
                   creatorId = match[1];
-                  console.log(`Found Creator ID for ${doc.$id}: ${creatorId}`);
                   break;
               }
           }
@@ -46,23 +41,18 @@ const Home = () => {
           // Fallback to denormalized attribute if needed
           if (!creatorId && doc.creatorId) {
              creatorId = doc.creatorId;
-             console.log(`Using fallback creatorId attribute for ${doc.$id}: ${creatorId}`);
           }
           // --- End Creator ID Extraction ---
 
           // Generate thumbnail URL using the File ID stored in the document
           let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
-          console.log(`Checking doc ${doc.$id}...`);
           if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
-            console.log(`Found thumbnail_id for ${doc.$id}: ${doc.thumbnail_id}`);
             try {
               const previewUrlObject = storage.getFilePreview(
                 appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
                 doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
               );
-              console.log(`Preview URL object for ${doc.$id}:`, previewUrlObject); // Log the object itself
               thumbnailUrl = previewUrlObject.toString(); // Convert URL object to string
-              console.log(`Generated thumbnail URL for ${doc.$id}: ${thumbnailUrl}`);
             } catch (previewError) {
               console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
               // Keep the default fallback URL if preview generation fails
@@ -89,10 +79,8 @@ const Home = () => {
           };
         });
 
-        console.log('Fetched Videos:', fetchedVideos); // Log the fetched and mapped videos
         setVideos(fetchedVideos); // Set fetched data
       } catch (err) {
-        console.error("Error fetching videos:", err);
         setError(err.message || "An unknown error occurred while fetching videos.");
       } finally {
         setLoading(false); // Stop loading indicator

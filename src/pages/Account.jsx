@@ -32,7 +32,6 @@ const Account = () => {
       // Update name if it has changed
       if (name !== user.name) {
         await account.updateName(name);
-        console.log("Name updated successfully");
         profileUpdated = true;
       }
 
@@ -48,7 +47,6 @@ const Account = () => {
             description: description, // Update/add description
             profileImageUrl: profileImageUrl // Update/add profileImageUrl
           });
-          console.log("Preferences updated successfully");
       }
 
       // Refresh the user state in the context
@@ -59,7 +57,6 @@ const Account = () => {
       } // Only show success if something actually changed
 
     } catch (err) {
-      console.error("Account update error:", err);
       setError(err.message || 'Failed to update account. Please try again.');
     } finally {
       setLoading(false);

@@ -27,7 +27,6 @@ const formatTimeAgo = (dateString) => {
         // Use parseISO to convert Appwrite's ISO string to a Date object
         return formatDistanceToNowStrict(parseISO(dateString), { addSuffix: true });
     } catch (e) {
-        console.error("Error formatting date:", e, "Input:", dateString); // Log input on error
         return "some time ago"; // Fallback
     }
 }
@@ -54,8 +53,6 @@ const VideoDetail = () => {
           appwriteConfig.videosCollectionId,
           videoId
         );
-        
-        console.log("Document Permissions:", doc.$permissions);
 
         // --- Get Creator/Channel Info ---
         // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)
@@ -108,7 +105,6 @@ const VideoDetail = () => {
             const match = perm.match(deletePermissionRegex);
             if (match && match[1]) {
                 creatorId = match[1];
-                console.log("Found Creator ID from permissions:", creatorId);
                 break;
             }
         }
@@ -116,7 +112,6 @@ const VideoDetail = () => {
         // If creatorId wasn't found via permissions, try the denormalized attribute as a fallback
         if (!creatorId && doc.creatorId) {
              creatorId = doc.creatorId;
-             console.log("Using fallback creatorId from document attribute:", creatorId);
         }
 
         // If a creatorId was determined, attempt to fetch the user's real name and avatar pref
@@ -126,49 +121,41 @@ const VideoDetail = () => {
                 // NOTE: This requires read permission for 'users' or specific user for the client
                 const creatorAccount = await account.get(creatorId);
                 creatorName = creatorAccount.name || creatorName; // Use fetched name if available
-                console.log("Fetched creator account:", creatorAccount.name);
 
                 // Check if a custom profile image URL is stored in user preferences
                 // Assuming prefs structure like { profileImageUrl: '...' }
                 const prefs = creatorAccount.prefs || {};
                 if (prefs.profileImageUrl && !channelAvatarUrl) { // Prioritize denormalized URL if it exists
                    channelAvatarUrl = prefs.profileImageUrl;
-                   console.log("Using avatar from user preferences.");
                 }
 
             } catch (userFetchError) {
                 // Log error only if it's not a standard permission error (optional)
                 if (userFetchError.code !== 401 && userFetchError.code !== 403) {
-                   console.error("Failed to fetch creator details:", userFetchError);
+                   // Error fetching user details
                 } else {
-                   console.warn(`Could not fetch details for user ${creatorId} (permissions?). Falling back to stored data.`);
+                   // Permission-related fetch error
                 }
                 // Fallback to denormalized data (already set as defaults)
             }
         } else {
-            console.log("Could not determine Creator ID from permissions or attribute.");
+            // Could not determine Creator ID
         }
 
         // Final Avatar Fallback: Generate initials if no specific URL was found/fetched
         if (!channelAvatarUrl) {
-            console.log("No channelAvatarUrl found from document or prefs. Attempting initials fallback.");
             let initialBase = '?'; // Default fallback identifier
 
             if (creatorName && creatorName !== 'Unknown Channel') {
                 initialBase = creatorName; // Prioritize name if available and not default
-                console.log(`Using creatorName ('${creatorName}') for avatar initials.`);
             } else if (creatorId) {
                 initialBase = creatorId; // Fallback to creatorId if name is unavailable/default
-                console.log(`Using creatorId ('${creatorId}') for avatar initials.`);
-            } else {
-                console.log("Using '?' for avatar initials as name and ID are unavailable.");
             }
 
             try {
                 channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
-                console.log("Generated initials avatar URL:", channelAvatarUrl);
             } catch (avatarError) {
-                console.error("Error generating initials avatar:", avatarError);
+                // Error generating avatar
                 // Keep channelAvatarUrl as null or set a default placeholder if needed
                 channelAvatarUrl = 'https://via.placeholder.com/48?text=ERR'; // Basic error placeholder
             }

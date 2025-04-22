@@ -54,7 +54,6 @@ const Auth = ({ type }) => {
         navigate('/');
       }
     } catch (err) {
-      console.error("Auth error:", err);
       // Handle specific Appwrite errors with more user-friendly messages
       if (err.code === 400) {
         setError('Invalid email or password');

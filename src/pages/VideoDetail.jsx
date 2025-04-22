@@ -49,13 +49,11 @@ const VideoDetail = () => {
 
       try {
         // --- Fetch Video Document from Appwrite ---
-        console.log(`Fetching document with ID: ${videoId}`);
         const doc = await databases.getDocument(
           appwriteConfig.databaseId,
           appwriteConfig.videosCollectionId,
           videoId
         );
-        console.log("Fetched Document:", doc);
 
         // --- Get Creator/Channel Info ---
         // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)
@@ -65,21 +63,17 @@ const VideoDetail = () => {
         // --- Generate Video URL from Storage (using 'video_id') ---
         let videoStreamUrl = '';
         if (doc.video_id) { // Use video_id attribute name
-          console.log(`Found video_id: ${doc.video_id}`);
           try {
             // Use getFileView for direct streaming URL
             videoStreamUrl = storage.getFileView(
               appwriteConfig.storageVideosBucketId,
               doc.video_id // Use the video file ID
             ); // Get the URL string
-            console.log("Generated video stream URL:", videoStreamUrl);
           } catch (fileError) {
-            console.error("Error getting video file URL:", fileError);
             setError("Could not load video file.");
             // Optionally stop loading here if video is critical
           }
         } else {
-          console.warn("Video file ID (video_id) missing from document.");
           setError("Video file information missing.");
           // Optionally stop loading
         }
@@ -87,20 +81,15 @@ const VideoDetail = () => {
         // --- Generate Thumbnail URL (using 'thumbnail_id') ---
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
         if (doc.thumbnail_id) { // Use thumbnail_id attribute name
-          console.log(`Found thumbnail_id: ${doc.thumbnail_id}`);
           try {
             // Use getFilePreview for thumbnail image
             thumbnailUrl = storage.getFilePreview(
               appwriteConfig.storageVideosBucketId,
               doc.thumbnail_id // Use the thumbnail file ID
             ).href; // Get the URL string
-            console.log("Generated thumbnail URL:", thumbnailUrl);
           } catch (thumbError) {
-            console.error("Error getting thumbnail preview:", thumbError);
             // Keep the default fallback if preview generation fails
           }
-        } else {
-          console.warn("Thumbnail file ID (thumbnail_id) missing from document.");
         }
 
         // --- Determine Channel Avatar ---
@@ -113,7 +102,6 @@ const VideoDetail = () => {
             // Generate initials from name if available, otherwise use ID, else fallback '?'
             const initialBase = creatorName !== 'Unknown Channel' ? creatorName : (creatorId || '?');
             channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
-            console.log(`Generated fallback avatar initials for: ${initialBase}`);
         }
 
         // --- Map Appwrite data to video state object ---
@@ -140,7 +128,6 @@ const VideoDetail = () => {
 
         // --- Fetch Related Videos (Keep simulation for now or implement later) ---
         // TODO: Replace with actual related videos fetch logic (e.g., based on tags, channel)
-        console.log("Setting related videos simulation (placeholder)");
         const simulatedRelated = Array.from({ length: 5 }, (_, i) => ({
            id: `sim-rel-${i}`, title: `Related Video ${i+1}`, thumbnailUrl: `https://picsum.photos/seed/related${i}/168/94`,
            durationSeconds: 300+i*30, viewCount: 1000+i*500, uploadedAt: new Date().toISOString(), channel: { name: 'Related Channel', profileImageUrl: `https://i.pravatar.cc/48?u=rel${i}` }
@@ -148,7 +135,6 @@ const VideoDetail = () => {
         setRelatedVideos(simulatedRelated);
 
       } catch (err) {
-        console.error("Error fetching video details:", err);
         // Handle specific errors like Not Found (404)
         if (err.code === 404) {
           setError("Video not found.");

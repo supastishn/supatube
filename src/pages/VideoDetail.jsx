@@ -95,17 +95,42 @@ const VideoDetail = () => {
           }
         }
 
-        // --- Determine Channel Avatar ---
+        // --- Determine Channel Avatar & Creator ID ---
+        let creatorId = null; // Initialize creatorId
         const creatorName = doc.channelName || 'Unknown Channel'; // Use denormalized name
-        const creatorId = doc.creatorId || null; // Use denormalized creator user ID (optional, depends on schema)
-        console.log("Acquired Creator ID:", creatorId);
-        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Use denormalized profile image URL
 
-        if (!channelAvatarUrl) {
-            // Fallback to initials if no profile image URL is stored
-            // Generate initials from name if available, otherwise use ID, else fallback '?'
-            const initialBase = creatorName !== 'Unknown Channel' ? creatorName : (creatorId || '?');
-            channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
+        // Find the user ID with delete permission (usually the creator) from permissions
+        const permissions = doc.$permissions || [];
+        const deletePermissionRegex = /^delete\("user:(.+)"\)$/; // Regex to extract user ID
+
+        for (const perm of permissions) {
+            const match = perm.match(deletePermissionRegex);
+            if (match && match[1]) {
+                creatorId = match[1]; // Found the user ID
+                console.log("Found Creator ID from permissions:", creatorId);
+                break; // Stop searching once found
+            }
+        }
+
+        // If creatorId wasn't found via permissions, try the denormalized attribute as a fallback
+        if (!creatorId && doc.creatorId) {
+             creatorId = doc.creatorId;
+             console.log("Using fallback creatorId from document attribute:", creatorId);
+        } else if (!creatorId) {
+             console.log("Could not determine Creator ID from permissions or attribute.");
+        }
+
+        // Determine Channel Avatar URL
+        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Use denormalized profile image URL first
+
+        if (!channelAvatarUrl && creatorId) { // Check if creatorId was found before generating initials
+            // Fallback to initials based on the found creatorId if no profile image URL is stored
+            channelAvatarUrl = appwriteAvatars.getInitials(creatorId).href;
+        } else if (!channelAvatarUrl) {
+            // Last fallback if no URL and no ID found - use name or '?'
+             const initialBase = creatorName !== 'Unknown Channel' ? creatorName : '?';
+             channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
+             console.log("Generating avatar from name/fallback as ID was unavailable.");
         }
 
         // --- Map Appwrite data to video state object ---

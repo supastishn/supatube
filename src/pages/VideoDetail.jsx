@@ -66,7 +66,7 @@ const VideoDetail = () => {
             videoStreamUrl = storage.getFileView(
               appwriteConfig.storageVideosBucketId,
               doc.video_id // Use the video file ID
-            ).href; // Get the URL string
+            ); // Get the URL string
             console.log("Generated video stream URL:", videoStreamUrl);
           } catch (fileError) {
             console.error("Error getting video file URL:", fileError);

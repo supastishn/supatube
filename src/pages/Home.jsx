@@ -41,6 +41,7 @@ const Home = () => {
           }
         }));
 
+        console.log('Fetched Videos:', fetchedVideos); // Log the fetched and mapped videos
         setVideos(fetchedVideos); // Set fetched data
       } catch (err) {
         console.error("Error fetching videos:", err);

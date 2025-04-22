@@ -65,9 +65,10 @@ const VideoCard = ({ video, isRelated = false }) => {
   } = video || defaultVideo;
 
   const {
-      id: channelId,
-      name: channelName,
-      profileImageUrl: channelAvatar
+      // Use standard names matching the structure from Home.jsx
+      id, // Channel ID (might be derived)
+      name, // Channel Name
+      profileImageUrl // Channel Avatar URL
   } = channel || defaultVideo.channel;
 
   // Determine card layout based on context (e.g., grid vs. list/related)
@@ -89,11 +90,11 @@ const VideoCard = ({ video, isRelated = false }) => {
       {/* Video Information Section */}
       <div className="video-info">
         {/* Channel Avatar (only for grid layout) */}
-        {!isRelated && channelAvatar && (
-          <Link to={`/channel/${channelId}`} className="channel-avatar-link">
+        {!isRelated && (
+          <Link to={`/profile/${id}`} className="channel-avatar-link">
              <img
-               src={channelAvatar}
-               alt={`${channelName} avatar`}
+               src={profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=random`}
+               alt={`${name || 'Channel'} avatar`}
                className="channel-avatar"
                loading="lazy"
              />
@@ -105,8 +106,8 @@ const VideoCard = ({ video, isRelated = false }) => {
           <Link to={`/videos/${id}`} className="video-title-link" title={title}>
             <h3 className="video-title">{title}</h3>
           </Link>
-          <Link to={`/channel/${channelId}`} className="channel-name-link" title={channelName}>
-            {channelName}
+          <Link to={`/profile/${id}`} className="channel-name-link" title={name}>
+            {name || 'Unknown Channel'}
           </Link>
           <div className="video-stats">
             <span>{formatViews(viewCount)} views</span>

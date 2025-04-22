@@ -6,8 +6,8 @@ import App from './App.jsx';
 import './index.css';
 import eruda from 'eruda';
 
-// Initialize Eruda console
-eruda.init();
+// Initialize Eruda console (temporarily disabled to troubleshoot conflicts)
+// eruda.init();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { databases, appwriteConfig } from '../lib/appwriteConfig';
+import { databases, appwriteConfig, storage, avatars, account } from '../lib/appwriteConfig';
 import { Query } from 'appwrite';
 import VideoCard from '../components/VideoCard'; // Assumes VideoCard is in components folder
 import '../App.css'; // Using general App styles, adjust if needed
@@ -40,7 +40,78 @@ const SearchResults = () => {
               Query.orderDesc('$createdAt') // Order results (optional)
             ]
           );
-          setVideos(response.documents);
+
+          // --- Process search results like in Home.jsx ---
+          const fetchedVideos = await Promise.all(response.documents.map(async (doc) => {
+            // Extract Creator ID from Permissions
+            let creatorId = null;
+            const permissions = doc.$permissions || [];
+            const deletePermissionRegex = /^delete\("user:(.+)"\)$/;
+            for (const perm of permissions) {
+              const match = perm.match(deletePermissionRegex);
+              if (match && match[1]) {
+                creatorId = match[1];
+                break;
+              }
+            }
+            if (!creatorId && doc.creatorId) { creatorId = doc.creatorId; } // Fallback
+
+            // Initialize Channel Info
+            let channelName = doc.channelName || 'Unknown Channel';
+            let channelAvatarUrl = doc.channelProfileImageUrl || null;
+
+            // Fetch Creator Details if ID exists
+            if (creatorId) {
+              try {
+                const creatorAccount = await account.get(creatorId);
+                channelName = creatorAccount.name || channelName;
+                const prefs = creatorAccount.prefs || {};
+                if (prefs.profileImageUrl && !channelAvatarUrl) {
+                  channelAvatarUrl = prefs.profileImageUrl;
+                }
+              } catch (userFetchError) {
+                console.warn(`[Search/${doc.$id}] Could not fetch details for creator ${creatorId}:`, userFetchError);
+              }
+            }
+
+            // Final Avatar Fallback Logic
+            if (!channelAvatarUrl) {
+              channelAvatarUrl = creatorId
+                ? avatars.getInitials(creatorId).href
+                : avatars.getInitials(channelName || '?').href;
+            }
+
+            // Generate Thumbnail URL
+            let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail';
+            if (doc.thumbnail_id) {
+              try {
+                thumbnailUrl = storage.getFilePreview(
+                  appwriteConfig.storageVideosBucketId,
+                  doc.thumbnail_id
+                ).href; // Get the URL string directly
+              } catch (previewError) {
+                console.error(`[SearchThumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
+              }
+            }
+
+            // Construct video object for VideoCard
+            return {
+              id: doc.$id,
+              title: doc.title || 'Untitled Video',
+              thumbnailUrl: thumbnailUrl,
+              durationSeconds: doc.durationSeconds || 0,
+              viewCount: doc.viewCount || 0,
+              uploadedAt: doc.$createdAt,
+              channel: {
+                id: creatorId || doc.channelId || `channel-${doc.$id}`,
+                name: channelName,
+                profileImageUrl: channelAvatarUrl,
+                creatorUserId: creatorId // Pass the creator user ID explicitly
+              }
+            };
+          }));
+
+          setVideos(fetchedVideos); // Set processed videos
         } catch (err) {
           console.error('Failed to fetch search results:', err);
           // Provide a user-friendly error message

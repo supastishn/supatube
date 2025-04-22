@@ -4,6 +4,10 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import App from './App.jsx';
 import './index.css';
+import eruda from 'eruda';
+
+// Initialize Eruda console
+eruda.init();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

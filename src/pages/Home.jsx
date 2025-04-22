@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component is in ../components
+import { databases } from '../lib/appwriteConfig';
+import { Query } from 'appwrite';
+import { appwriteConfig } from '../lib/appwriteConfig';
 
 const Home = () => {
   const [videos, setVideos] = useState([]);
@@ -12,31 +15,33 @@ const Home = () => {
       setLoading(true);
       setError(null); // Reset error state
       try {
-        // --- Replace this block with your actual API call ---
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-        
-        // Example: Check for a specific condition to simulate an error
-        // if (Math.random() > 0.8) {
-        //   throw new Error("Failed to fetch videos. Please try again later.");
-        // }
+        // Fetch videos from Appwrite
+        const response = await databases.listDocuments(
+          appwriteConfig.databaseId,
+          appwriteConfig.videosCollectionId,
+          [Query.orderDesc('$createdAt')] // Example: Order by creation date, newest first
+        );
 
-        // Simulated video data (replace with actual fetched data)
-        const simulatedData = Array.from({ length: 16 }, (_, index) => ({
-          id: `sim-video-${index + 1}`,
-          title: `React Hooks Tutorial #${index + 1}: Mastering useState & useEffect Like a Pro`,
-          thumbnailUrl: `https://picsum.photos/seed/${100 + index}/320/180`, // Using picsum for random images
-          durationSeconds: Math.floor(Math.random() * 1200) + 60, // Random duration between 1 min and 21 mins
-          viewCount: Math.floor(Math.random() * 2000000) + 1000, // Random views
-          uploadedAt: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000).toISOString(), // Random date within last 30 days
+        // Map Appwrite documents to the video structure expected by VideoCard
+        // IMPORTANT: Adjust the attribute names (e.g., doc.thumbnailUrl, doc.channelName)
+        // to match YOUR Appwrite collection schema EXACTLY.
+        const fetchedVideos = response.documents.map(doc => ({
+          id: doc.$id,
+          title: doc.title || 'Untitled Video', // Provide fallback
+          thumbnailUrl: doc.thumbnailUrl || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail', // Provide fallback
+          durationSeconds: doc.durationSeconds || 0, // Provide fallback
+          viewCount: doc.viewCount || 0, // Provide fallback
+          uploadedAt: doc.$createdAt, // Use Appwrite's built-in timestamp
           channel: {
-            id: `sim-channel-${Math.floor(index / 4) + 1}`,
-            name: `Awesome Dev Channel ${Math.floor(index / 4) + 1}`,
-            profileImageUrl: `https://i.pravatar.cc/48?u=channel${Math.floor(index / 4) + 1}`
+            // Assuming channel info is stored directly on the video document for simplicity
+            // If channel is a relationship, you'll need more complex fetching/mapping
+            id: doc.channelId || `channel-${doc.$id}`, // Example placeholder if no specific channel ID is stored
+            name: doc.channelName || 'Unknown Channel', // Adjust attribute name
+            profileImageUrl: doc.channelProfileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.channelName || 'U')}&background=random`, // Example fallback avatar
           }
         }));
-        // --- End of simulation block ---
 
-        setVideos(simulatedData); // Set fetched data
+        setVideos(fetchedVideos); // Set fetched data
       } catch (err) {
         console.error("Error fetching videos:", err);
         setError(err.message || "An unknown error occurred while fetching videos.");

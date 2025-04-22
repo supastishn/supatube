@@ -32,7 +32,7 @@ const Home = () => {
           // Generate thumbnail URL using the File ID stored in the document
           let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
           console.log(`Checking doc ${doc.$id}...`);
-          if (doc.thumbnailFileId) { // Check if the thumbnail file ID exists
+          if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
             console.log(`Found thumbnailFileId for ${doc.$id}: ${doc.thumbnailFileId}`);
             try {
               thumbnailUrl = storage.getFilePreview(

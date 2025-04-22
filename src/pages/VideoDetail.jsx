@@ -54,6 +54,8 @@ const VideoDetail = () => {
           appwriteConfig.videosCollectionId,
           videoId
         );
+        
+        console.log("Document Permissions:", doc.$permissions);
 
         // --- Get Creator/Channel Info ---
         // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)

@@ -10,7 +10,7 @@ const Home = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    print('ee')
+    console.log('ee')
     const fetchVideos = async () => {
       setLoading(true);
       setError(null); // Reset error state
@@ -27,19 +27,19 @@ const Home = () => {
         // Map Appwrite documents to the video structure expected by VideoCard
         // IMPORTANT: Adjust the attribute names (e.g., doc.thumbnailUrl, doc.channelName)
         // to match YOUR Appwrite collection schema EXACTLY.
-        print(response.documents)
+        console.log('Documents before map:', response.documents);
         const fetchedVideos = response.documents.map(doc => {
           // Generate thumbnail URL using the File ID stored in the document
           let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
-          print('checking')
+          console.log(`Checking doc ${doc.$id}...`);
           if (doc.thumbnailFileId) { // Check if the thumbnail file ID exists
-            print('success')
+            console.log(`Found thumbnailFileId for ${doc.$id}: ${doc.thumbnailFileId}`);
             try {
               thumbnailUrl = storage.getFilePreview(
                 appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
                 doc.thumbnailFileId                 // The attribute holding the thumbnail's File ID
               ).href; // Get the URL string from the URL object
-            print(thumbnailUrl)
+            console.log(`Generated thumbnail URL for ${doc.$id}: ${thumbnailUrl}`);
             } catch (previewError) {
               console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
               // Keep the default fallback URL if preview generation fails

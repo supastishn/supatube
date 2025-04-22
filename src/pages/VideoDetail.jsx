@@ -78,18 +78,12 @@ const VideoDetail = () => {
           // Optionally stop loading
         }
 
-        // --- Generate Thumbnail URL (using 'thumbnail_id') ---
+        // --- Use Thumbnail URL ---
+        // Use the URL stored directly in the document attribute 'thumbnailUrl'
+        // Adjust 'doc.thumbnailUrl' if your attribute name is different
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
-        if (doc.thumbnail_id) { // Use thumbnail_id attribute name
-          try {
-            // Use getFilePreview for thumbnail image
-            thumbnailUrl = storage.getFilePreview(
-              appwriteConfig.storageVideosBucketId,
-              doc.thumbnail_id // Use the thumbnail file ID
-            ).href; // Get the URL string
-          } catch (thumbError) {
-            // Keep the default fallback if preview generation fails
-          }
+        if (doc.thumbnailUrl) {
+           thumbnailUrl = doc.thumbnailUrl;
         }
 
         // --- Determine Channel Avatar & Creator ID ---

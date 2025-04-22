@@ -69,19 +69,10 @@ const Home = () => {
                     : avatars.getInitials(channelName || '?').href; // Then from name, then '?'
             }
 
-            // --- Generate Thumbnail URL ---
-            let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
-            if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
-                try {
-                    thumbnailUrl = storage.getFilePreview(
-                        appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
-                        doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
-                    ).href; // Get the URL string
-                } catch (previewError) {
-                    console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
-                    // Keep the default fallback URL if preview generation fails
-                }
-            }
+            // --- Use Thumbnail URL ---
+            // Use the URL stored directly in the document attribute 'thumbnailUrl'
+            // Adjust 'doc.thumbnailUrl' if your attribute name is different
+            const thumbnailUrl = doc.thumbnailUrl || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
 
             return {
                 id: doc.$id,

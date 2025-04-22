@@ -35,11 +35,13 @@ const Home = () => {
           if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
             console.log(`Found thumbnail_id for ${doc.$id}: ${doc.thumbnail_id}`);
             try {
-              thumbnailUrl = storage.getFilePreview(
+              const previewUrlObject = storage.getFilePreview(
                 appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
                 doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
-              ).href; // Get the URL string from the URL object
-            console.log(`Generated thumbnail URL for ${doc.$id}: ${thumbnailUrl}`);
+              );
+              console.log(`Preview URL object for ${doc.$id}:`, previewUrlObject); // Log the object itself
+              thumbnailUrl = previewUrlObject.toString(); // Convert URL object to string
+              console.log(`Generated thumbnail URL for ${doc.$id}: ${thumbnailUrl}`);
             } catch (previewError) {
               console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
               // Keep the default fallback URL if preview generation fails

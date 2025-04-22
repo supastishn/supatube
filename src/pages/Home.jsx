@@ -22,6 +22,8 @@ const Home = () => {
           [Query.orderDesc('$createdAt')] // Example: Order by creation date, newest first
         );
 
+        console.log('Raw Appwrite Response:', response); // Log the raw response object
+
         // Map Appwrite documents to the video structure expected by VideoCard
         // IMPORTANT: Adjust the attribute names (e.g., doc.thumbnailUrl, doc.channelName)
         // to match YOUR Appwrite collection schema EXACTLY.

@@ -95,6 +95,7 @@ const VideoDetail = () => {
         // --- Determine Channel Avatar ---
         const creatorName = doc.channelName || 'Unknown Channel'; // Use denormalized name
         const creatorId = doc.creatorId || null; // Use denormalized creator user ID (optional, depends on schema)
+        console.log("Acquired Creator ID:", creatorId);
         let channelAvatarUrl = doc.channelProfileImageUrl || null; // Use denormalized profile image URL
 
         if (!channelAvatarUrl) {

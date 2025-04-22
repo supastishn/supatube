@@ -149,18 +149,29 @@ const VideoDetail = () => {
             console.log("Could not determine Creator ID from permissions or attribute.");
         }
 
-        // Final Avatar Fallback: Generate initials if no URL was found
+        // Final Avatar Fallback: Generate initials if no specific URL was found/fetched
         if (!channelAvatarUrl) {
-            let initialBase;
-            if (creatorName !== 'Unknown Channel') {
-                initialBase = creatorName; // Use name if available
+            console.log("No channelAvatarUrl found from document or prefs. Attempting initials fallback.");
+            let initialBase = '?'; // Default fallback identifier
+
+            if (creatorName && creatorName !== 'Unknown Channel') {
+                initialBase = creatorName; // Prioritize name if available and not default
+                console.log(`Using creatorName ('${creatorName}') for avatar initials.`);
             } else if (creatorId) {
-                initialBase = creatorId; // Fallback to creatorId if name is unknown but ID exists
+                initialBase = creatorId; // Fallback to creatorId if name is unavailable/default
+                console.log(`Using creatorId ('${creatorId}') for avatar initials.`);
             } else {
-                initialBase = '?'; // Last resort if both name and ID are unknown
+                console.log("Using '?' for avatar initials as name and ID are unavailable.");
             }
-            channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
-            console.log("Generating avatar from initials using base:", initialBase);
+
+            try {
+                channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
+                console.log("Generated initials avatar URL:", channelAvatarUrl);
+            } catch (avatarError) {
+                console.error("Error generating initials avatar:", avatarError);
+                // Keep channelAvatarUrl as null or set a default placeholder if needed
+                channelAvatarUrl = 'https://via.placeholder.com/48?text=ERR'; // Basic error placeholder
+            }
         }
 
         // --- Map Appwrite data to video state object ---

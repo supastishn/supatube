@@ -77,8 +77,10 @@ const Home = () => {
 
             // --- Use Thumbnail URL ---
             // Use the URL stored directly in the document attribute 'thumbnailUrl'
+            console.log(`[Thumb/${doc.$id}] Checking doc.thumbnailUrl:`, doc.thumbnailUrl); // Log the attribute value
             // Adjust 'doc.thumbnailUrl' if your attribute name is different
             const thumbnailUrl = doc.thumbnailUrl || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
+            console.log(`[Thumb/${doc.$id}] Final thumbnailUrl used:`, thumbnailUrl); // Log the final URL
 
             console.log(`[Home/${doc.$id}] Final Channel Data for Card:`, { 
                 id: creatorId || doc.channelId || `channel-${doc.$id}`, 

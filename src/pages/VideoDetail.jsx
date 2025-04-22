@@ -80,10 +80,14 @@ const VideoDetail = () => {
 
         // --- Use Thumbnail URL ---
         // Use the URL stored directly in the document attribute 'thumbnailUrl'
+        console.log(`[DetailThumb/${videoId}] Checking doc.thumbnailUrl:`, doc.thumbnailUrl); // Log the attribute value
         // Adjust 'doc.thumbnailUrl' if your attribute name is different
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
         if (doc.thumbnailUrl) {
+           console.log(`[DetailThumb/${videoId}] Using doc.thumbnailUrl.`);
            thumbnailUrl = doc.thumbnailUrl;
+        } else {
+            console.log(`[DetailThumb/${videoId}] Using fallback thumbnail.`);
         }
 
         // --- Determine Channel Avatar & Creator ID ---

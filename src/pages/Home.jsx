@@ -26,6 +26,7 @@ const Home = () => {
             // --- Extract Creator ID from Permissions ---
             let creatorId = null;
             const permissions = doc.$permissions || [];
+            console.log(`[Home/${doc.$id}] Permissions:`, permissions); // Log permissions
             const deletePermissionRegex = /^delete\("user:(.+)"\)$/;
 
             for (const perm of permissions) {
@@ -35,6 +36,7 @@ const Home = () => {
                   break;
               }
             }
+            console.log(`[Home/${doc.$id}] Extracted Creator ID:`, creatorId); // Log extracted ID
             // Fallback to denormalized attribute if needed
             if (!creatorId && doc.creatorId) {
                creatorId = doc.creatorId;
@@ -46,18 +48,22 @@ const Home = () => {
 
             // --- Fetch Creator Details if ID exists ---
             if (creatorId) {
+                console.log(`[Home/${doc.$id}] Attempting to fetch account for creatorId: ${creatorId}`);
                 try {
                     const creatorAccount = await account.get(creatorId);
+                    console.log(`[Home/${doc.$id}] Fetched account:`, creatorAccount); // Log fetched account
                     channelName = creatorAccount.name || channelName; // Prioritize fetched name
+                    console.log(`[Home/${doc.$id}] Channel name after fetch: '${channelName}' (Used: ${creatorAccount.name ? 'Fetched' : 'Fallback'})`);
 
                     // Use fetched profile image URL if available and no denormalized one exists
                     const prefs = creatorAccount.prefs || {};
                     if (prefs.profileImageUrl && !channelAvatarUrl) {
                         channelAvatarUrl = prefs.profileImageUrl;
+                        console.log(`[Home/${doc.$id}] Using profile image URL from prefs: ${channelAvatarUrl}`);
                     }
                 } catch (userFetchError) {
                     // Handle or log error fetching user details (e.g., permissions issue)
-                    // console.warn(`Could not fetch details for creator ${creatorId}:`, userFetchError);
+                    console.warn(`[Home/${doc.$id}] Could not fetch details for creator ${creatorId}:`, userFetchError);
                     // Continue with potentially denormalized data
                 }
             }
@@ -74,6 +80,13 @@ const Home = () => {
             // Adjust 'doc.thumbnailUrl' if your attribute name is different
             const thumbnailUrl = doc.thumbnailUrl || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
 
+            console.log(`[Home/${doc.$id}] Final Channel Data for Card:`, { 
+                id: creatorId || doc.channelId || `channel-${doc.$id}`, 
+                name: channelName, 
+                profileImageUrl: channelAvatarUrl, 
+                creatorUserId: creatorId 
+            }); // Log final data
+            
             return {
                 id: doc.$id,
                 title: doc.title || 'Untitled Video', // Provide fallback

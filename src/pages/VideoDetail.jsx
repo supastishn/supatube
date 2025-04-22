@@ -5,7 +5,7 @@ import { formatDistanceToNowStrict, parseISO } from 'date-fns'; // For time ago 
 import { Fragment } from 'react'; // Import Fragment if needed for structure
 
 // Appwrite Imports
-import { databases, storage, avatars as appwriteAvatars } from '../lib/appwriteConfig';
+import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
 import { appwriteConfig } from '../lib/appwriteConfig';
 
 // Helper function to format view counts (e.g., 1.2M, 10K)
@@ -96,8 +96,9 @@ const VideoDetail = () => {
         }
 
         // --- Determine Channel Avatar & Creator ID ---
-        let creatorId = null; // Initialize creatorId
-        const creatorName = doc.channelName || 'Unknown Channel'; // Use denormalized name
+        let creatorId = null;
+        let creatorName = doc.channelName || 'Unknown Channel'; // Default to denormalized name
+        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Default to denormalized URL
 
         // Find the user ID with delete permission (usually the creator) from permissions
         const permissions = doc.$permissions || [];
@@ -106,9 +107,9 @@ const VideoDetail = () => {
         for (const perm of permissions) {
             const match = perm.match(deletePermissionRegex);
             if (match && match[1]) {
-                creatorId = match[1]; // Found the user ID
+                creatorId = match[1];
                 console.log("Found Creator ID from permissions:", creatorId);
-                break; // Stop searching once found
+                break;
             }
         }
 
@@ -116,21 +117,44 @@ const VideoDetail = () => {
         if (!creatorId && doc.creatorId) {
              creatorId = doc.creatorId;
              console.log("Using fallback creatorId from document attribute:", creatorId);
-        } else if (!creatorId) {
-             console.log("Could not determine Creator ID from permissions or attribute.");
         }
 
-        // Determine Channel Avatar URL
-        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Use denormalized profile image URL first
+        // If a creatorId was determined, attempt to fetch the user's real name and avatar pref
+        if (creatorId) {
+            try {
+                // Attempt to get the user account associated with the creatorId
+                // NOTE: This requires read permission for 'users' or specific user for the client
+                const creatorAccount = await account.get(creatorId);
+                creatorName = creatorAccount.name || creatorName; // Use fetched name if available
+                console.log("Fetched creator account:", creatorAccount.name);
 
-        if (!channelAvatarUrl && creatorId) { // Check if creatorId was found before generating initials
-            // Fallback to initials based on the found creatorId if no profile image URL is stored
-            channelAvatarUrl = appwriteAvatars.getInitials(creatorId).href;
-        } else if (!channelAvatarUrl) {
-            // Last fallback if no URL and no ID found - use name or '?'
-             const initialBase = creatorName !== 'Unknown Channel' ? creatorName : '?';
-             channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
-             console.log("Generating avatar from name/fallback as ID was unavailable.");
+                // Check if a custom profile image URL is stored in user preferences
+                // Assuming prefs structure like { profileImageUrl: '...' }
+                const prefs = creatorAccount.prefs || {};
+                if (prefs.profileImageUrl && !channelAvatarUrl) { // Prioritize denormalized URL if it exists
+                   channelAvatarUrl = prefs.profileImageUrl;
+                   console.log("Using avatar from user preferences.");
+                }
+
+            } catch (userFetchError) {
+                // Log error only if it's not a standard permission error (optional)
+                if (userFetchError.code !== 401 && userFetchError.code !== 403) {
+                   console.error("Failed to fetch creator details:", userFetchError);
+                } else {
+                   console.warn(`Could not fetch details for user ${creatorId} (permissions?). Falling back to stored data.`);
+                }
+                // Fallback to denormalized data (already set as defaults)
+            }
+        } else {
+            console.log("Could not determine Creator ID from permissions or attribute.");
+        }
+
+        // Final Avatar Fallback: Generate initials if no URL was found
+        if (!channelAvatarUrl) {
+            // Generate initials based on the best available identifier
+            const initialBase = creatorName !== 'Unknown Channel' ? creatorName : (creatorId || '?');
+            channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
+            console.log("Generating avatar from initials using base:", initialBase);
         }
 
         // --- Map Appwrite data to video state object ---

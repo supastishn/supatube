@@ -11,11 +11,10 @@ const Header = ({ toggleSidebar, isMobile }) => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      // TODO: Implement actual search functionality
-      console.log('Searching for:', searchQuery);
-      // Example navigation (implement search results page later)
-      // navigate(`/search?query=${encodeURIComponent(searchQuery)}`);
+    const trimmedQuery = searchQuery.trim(); // Trim whitespace
+    if (trimmedQuery) {
+      // Navigate to the search results page with the trimmed query
+      navigate(`/search?query=${encodeURIComponent(trimmedQuery)}`);
       setSearchQuery(''); // Clear search input after submit
     }
   };

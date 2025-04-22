@@ -14,6 +14,7 @@ import Upload from './pages/Upload';
 import Profile from './pages/Profile';
 import Account from './pages/Account';
 import NotFound from './pages/NotFound';
+import SearchResults from './pages/SearchResults';
 // Placeholder pages for routes mentioned in Sidebar
 const Trending = () => <div>Trending Page</div>;
 const Subscriptions = () => <div>Subscriptions Page</div>;
@@ -101,6 +102,8 @@ function App() {
             {/* Core Content Routes */}
             <Route index element={<Home />} />
             <Route path="/videos/:id" element={<VideoDetail />} />
+            {/* Add the new search route below */}
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/upload" element={
               <ProtectedRoute>
                 <Upload />

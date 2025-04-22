@@ -75,11 +75,19 @@ const Home = () => {
                     : avatars.getInitials(channelName || '?').href; // Then from name, then '?'
             }
 
-            // --- Use Thumbnail URL ---
-            // Use the URL stored directly in the document attribute 'thumnbail_url'
-            console.log(`[Thumb/${doc.$id}] Checking doc.thumnbail_url:`, doc.thumnbail_url); // Log the correct attribute value
-            // Use the correct attribute name 'doc.thumnbail_url'
-            const thumbnailUrl = doc.thumnbail_url || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
+            // --- Generate Thumbnail URL using thumbnail_id ---
+            let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
+            console.log(`[Thumb/${doc.$id}] Checking doc.thumbnail_id:`, doc.thumbnail_id); // Log the ID attribute
+            if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
+                try {
+                    thumbnailUrl = storage.getFilePreview(
+                        appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
+                        doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
+                    ).href; // Get the URL string
+                } catch (previewError) {
+                    console.error(`[Thumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
+                }
+            }
             console.log(`[Thumb/${doc.$id}] Final thumbnailUrl used:`, thumbnailUrl); // Log the final URL
 
             console.log(`[Home/${doc.$id}] Final Channel Data for Card:`, { 

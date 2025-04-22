@@ -78,14 +78,19 @@ const VideoDetail = () => {
           // Optionally stop loading
         }
 
-        // --- Use Thumbnail URL ---
-        // Use the URL stored directly in the document attribute 'thumnbail_url'
-        console.log(`[DetailThumb/${videoId}] Checking doc.thumnbail_url:`, doc.thumnbail_url); // Log the correct attribute value
-        // Use the correct attribute name 'doc.thumnbail_url'
+        // --- Generate Thumbnail URL using thumbnail_id ---
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
-        if (doc.thumnbail_url) {
-           console.log(`[DetailThumb/${videoId}] Using doc.thumnbail_url.`);
-           thumbnailUrl = doc.thumnbail_url;
+        console.log(`[DetailThumb/${videoId}] Checking doc.thumbnail_id:`, doc.thumbnail_id); // Log the ID attribute
+        if (doc.thumbnail_id) { // Use thumbnail_id attribute name
+          try {
+            thumbnailUrl = storage.getFilePreview(
+              appwriteConfig.storageVideosBucketId,
+              doc.thumbnail_id // Use the thumbnail file ID
+            ).href; // Get the URL string
+            console.log(`[DetailThumb/${videoId}] Using generated thumbnail URL.`);
+          } catch (thumbError) {
+            console.error(`[DetailThumb/${videoId}] Error generating thumbnail preview URL:`, thumbError);
+          }
         } else {
             console.log(`[DetailThumb/${videoId}] Using fallback thumbnail.`);
         }

@@ -57,6 +57,11 @@ const VideoDetail = () => {
         );
         console.log("Fetched Document:", doc);
 
+        // --- Get Creator/Channel Info ---
+        // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)
+        // is denormalized and stored within the video document during upload.
+        // Client-side fetching of arbitrary user details by ID is generally restricted.
+
         // --- Generate Video URL from Storage (using 'video_id') ---
         let videoStreamUrl = '';
         if (doc.video_id) { // Use video_id attribute name
@@ -98,11 +103,18 @@ const VideoDetail = () => {
           console.warn("Thumbnail file ID (thumbnail_id) missing from document.");
         }
 
-        // --- Generate Channel Avatar (using fallback) ---
-        // Adjust based on how you store channel info (e.g., relation or direct attributes)
-        const channelAvatar = doc.channelProfileImageUrl // Check if a specific URL/ID is stored
-          ? doc.channelProfileImageUrl // Or logic to fetch avatar if it's an ID/relation
-          : appwriteAvatars.getInitials(doc.channelName || '?').href; // Fallback to initials generator
+        // --- Determine Channel Avatar ---
+        const creatorName = doc.channelName || 'Unknown Channel'; // Use denormalized name
+        const creatorId = doc.creatorId || null; // Use denormalized creator user ID (optional, depends on schema)
+        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Use denormalized profile image URL
+
+        if (!channelAvatarUrl) {
+            // Fallback to initials if no profile image URL is stored
+            // Generate initials from name if available, otherwise use ID, else fallback '?'
+            const initialBase = creatorName !== 'Unknown Channel' ? creatorName : (creatorId || '?');
+            channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
+            console.log(`Generated fallback avatar initials for: ${initialBase}`);
+        }
 
         // --- Map Appwrite data to video state object ---
         const fetchedVideo = {
@@ -117,9 +129,9 @@ const VideoDetail = () => {
           channel: {
             // Adjust attribute names based on your Appwrite collection schema
             id: doc.channelId || `channel-${doc.$id}`, // Use 'channelId' if available
-            name: doc.channelName || 'Unknown Channel', // Use 'channelName'
-            subscriberCount: doc.subscriberCount || 0, // Use 'subscriberCount'
-            profileImageUrl: channelAvatar,
+            name: creatorName, // Use extracted name
+            subscriberCount: doc.subscriberCount || 0, // Use denormalized count
+            profileImageUrl: channelAvatarUrl, // Use determined avatar URL
           }
           // Add other fields from 'doc' as needed
         };

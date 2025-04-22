@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component is in ../components
-import { databases, storage } from '../lib/appwriteConfig';
+import { databases, storage, avatars } from '../lib/appwriteConfig';
 import { Query } from 'appwrite';
 import { appwriteConfig } from '../lib/appwriteConfig';
 
@@ -29,6 +29,27 @@ const Home = () => {
         // to match YOUR Appwrite collection schema EXACTLY.
         console.log('Documents before map:', response.documents);
         const fetchedVideos = response.documents.map(doc => {
+          // --- Extract Creator ID from Permissions ---
+          let creatorId = null;
+          const permissions = doc.$permissions || [];
+          const deletePermissionRegex = /^delete\("user:(.+)"\)$/;
+
+          for (const perm of permissions) {
+              const match = perm.match(deletePermissionRegex);
+              if (match && match[1]) {
+                  creatorId = match[1];
+                  console.log(`Found Creator ID for ${doc.$id}: ${creatorId}`);
+                  break;
+              }
+          }
+
+          // Fallback to denormalized attribute if needed
+          if (!creatorId && doc.creatorId) {
+             creatorId = doc.creatorId;
+             console.log(`Using fallback creatorId attribute for ${doc.$id}: ${creatorId}`);
+          }
+          // --- End Creator ID Extraction ---
+
           // Generate thumbnail URL using the File ID stored in the document
           let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
           console.log(`Checking doc ${doc.$id}...`);
@@ -60,7 +81,10 @@ const Home = () => {
               // If channel is a relationship, you'll need more complex fetching/mapping
               id: doc.channelId || `channel-${doc.$id}`, // Example placeholder if no specific channel ID is stored
               name: doc.channelName || 'Unknown Channel', // Adjust attribute name
-              profileImageUrl: doc.channelProfileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.channelName || 'U')}&background=random`, // Example fallback avatar
+              profileImageUrl: doc.channelProfileImageUrl || (creatorId 
+                ? avatars.getInitials(creatorId).href
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.channelName || 'U')}&background=random`),
+              creatorUserId: creatorId // Pass the creator user ID explicitly
             }
           };
         });

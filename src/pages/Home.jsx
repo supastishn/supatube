@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component is in ../components
-import { databases } from '../lib/appwriteConfig';
+import { databases, storage } from '../lib/appwriteConfig';
 import { Query } from 'appwrite';
 import { appwriteConfig } from '../lib/appwriteConfig';
 
@@ -27,21 +27,37 @@ const Home = () => {
         // Map Appwrite documents to the video structure expected by VideoCard
         // IMPORTANT: Adjust the attribute names (e.g., doc.thumbnailUrl, doc.channelName)
         // to match YOUR Appwrite collection schema EXACTLY.
-        const fetchedVideos = response.documents.map(doc => ({
-          id: doc.$id,
-          title: doc.title || 'Untitled Video', // Provide fallback
-          thumbnailUrl: doc.thumbnailUrl || 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail', // Provide fallback
-          durationSeconds: doc.durationSeconds || 0, // Provide fallback
-          viewCount: doc.viewCount || 0, // Provide fallback
-          uploadedAt: doc.$createdAt, // Use Appwrite's built-in timestamp
-          channel: {
-            // Assuming channel info is stored directly on the video document for simplicity
-            // If channel is a relationship, you'll need more complex fetching/mapping
-            id: doc.channelId || `channel-${doc.$id}`, // Example placeholder if no specific channel ID is stored
-            name: doc.channelName || 'Unknown Channel', // Adjust attribute name
-            profileImageUrl: doc.channelProfileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.channelName || 'U')}&background=random`, // Example fallback avatar
+        const fetchedVideos = response.documents.map(doc => {
+          // Generate thumbnail URL using the File ID stored in the document
+          let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
+          if (doc.thumbnailFileId) { // Check if the thumbnail file ID exists
+            try {
+              thumbnailUrl = storage.getFilePreview(
+                appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
+                doc.thumbnailFileId                 // The attribute holding the thumbnail's File ID
+              ).href; // Get the URL string from the URL object
+            } catch (previewError) {
+              console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
+              // Keep the default fallback URL if preview generation fails
+            }
           }
-        }));
+
+          return {
+            id: doc.$id,
+            title: doc.title || 'Untitled Video', // Provide fallback
+            thumbnailUrl: thumbnailUrl, // Use the generated or fallback URL
+            durationSeconds: doc.durationSeconds || 0, // Provide fallback
+            viewCount: doc.viewCount || 0, // Provide fallback
+            uploadedAt: doc.$createdAt, // Use Appwrite's built-in timestamp
+            channel: {
+              // Assuming channel info is stored directly on the video document for simplicity
+              // If channel is a relationship, you'll need more complex fetching/mapping
+              id: doc.channelId || `channel-${doc.$id}`, // Example placeholder if no specific channel ID is stored
+              name: doc.channelName || 'Unknown Channel', // Adjust attribute name
+              profileImageUrl: doc.channelProfileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.channelName || 'U')}&background=random`, // Example fallback avatar
+            }
+          };
+        });
 
         console.log('Fetched Videos:', fetchedVideos); // Log the fetched and mapped videos
         setVideos(fetchedVideos); // Set fetched data

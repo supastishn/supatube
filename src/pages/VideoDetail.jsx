@@ -1,8 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component
-import { formatDistanceToNowStrict } from 'date-fns'; // For time ago formatting
-import { format } from 'date-fns'; // For exact date formatting
+import { formatDistanceToNowStrict, parseISO } from 'date-fns'; // For time ago formatting
+import { Fragment } from 'react'; // Import Fragment if needed for structure
+
+// Appwrite Imports
+import { databases, storage, avatars as appwriteAvatars } from '../lib/appwriteConfig';
+import { appwriteConfig } from '../lib/appwriteConfig';
 
 // Helper function to format view counts (e.g., 1.2M, 10K)
 const formatViews = (views) => {
@@ -18,10 +22,12 @@ const formatViews = (views) => {
 
 // Helper function to format date (e.g., 2 weeks ago)
 const formatTimeAgo = (dateString) => {
+    if (!dateString) return "some time ago"; // Handle null/undefined dates
     try {
-        return formatDistanceToNowStrict(new Date(dateString), { addSuffix: true });
+        // Use parseISO to convert Appwrite's ISO string to a Date object
+        return formatDistanceToNowStrict(parseISO(dateString), { addSuffix: true });
     } catch (e) {
-        console.error("Error formatting date:", e);
+        console.error("Error formatting date:", e, "Input:", dateString); // Log input on error
         return "some time ago"; // Fallback
     }
 }
@@ -35,53 +41,108 @@ const VideoDetail = () => {
   const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
-    // Simulate API call to fetch video details and related videos
     const fetchVideoData = async () => {
       setLoading(true);
       setError(null);
+      setVideo(null); // Reset video state
+      setRelatedVideos([]); // Reset related videos
+
       try {
-        // --- Replace with actual API calls ---
-        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate delay
+        // --- Fetch Video Document from Appwrite ---
+        console.log(`Fetching document with ID: ${videoId}`);
+        const doc = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.videosCollectionId,
+          videoId
+        );
+        console.log("Fetched Document:", doc);
 
-        // Simulate fetching main video data
-        const simulatedVideo = {
-          id: videoId,
-          title: `React Router v6 Tutorial - useParams Hook Explained (${videoId})`,
-          description: `Learn all about the useParams hook in React Router v6!\n\nIn this video, we cover:\n- How to access dynamic URL parameters.\n- Practical examples and use cases.\n- Common pitfalls and best practices.\n\nPerfect for beginners and intermediate React developers looking to master routing.\n\n#React #ReactRouter #WebDevelopment #Tutorial`,
-          // Use a real embeddable video for testing if possible
-          videoUrl: `https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1`, // Example (Rick Astley :))
-          viewCount: Math.floor(Math.random() * 5000000) + 10000,
-          likeCount: Math.floor(Math.random() * 100000) + 500,
-          uploadedAt: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000).toISOString(),
-          channel: {
-            id: `sim-channel-${Math.floor(Math.random() * 5) + 1}`,
-            name: `Coding Tutorials ${Math.floor(Math.random() * 5) + 1}`,
-            profileImageUrl: `https://i.pravatar.cc/100?u=channel${Math.floor(Math.random() * 5) + 1}`,
-            subscriberCount: Math.floor(Math.random() * 1000000) + 10000
+        // --- Generate Video URL from Storage (using 'video_id') ---
+        let videoStreamUrl = '';
+        if (doc.video_id) { // Use video_id attribute name
+          console.log(`Found video_id: ${doc.video_id}`);
+          try {
+            // Use getFileView for direct streaming URL
+            videoStreamUrl = storage.getFileView(
+              appwriteConfig.storageVideosBucketId,
+              doc.video_id // Use the video file ID
+            ).href; // Get the URL string
+            console.log("Generated video stream URL:", videoStreamUrl);
+          } catch (fileError) {
+            console.error("Error getting video file URL:", fileError);
+            setError("Could not load video file.");
+            // Optionally stop loading here if video is critical
           }
+        } else {
+          console.warn("Video file ID (video_id) missing from document.");
+          setError("Video file information missing.");
+          // Optionally stop loading
+        }
+
+        // --- Generate Thumbnail URL (using 'thumbnail_id') ---
+        let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
+        if (doc.thumbnail_id) { // Use thumbnail_id attribute name
+          console.log(`Found thumbnail_id: ${doc.thumbnail_id}`);
+          try {
+            // Use getFilePreview for thumbnail image
+            thumbnailUrl = storage.getFilePreview(
+              appwriteConfig.storageVideosBucketId,
+              doc.thumbnail_id // Use the thumbnail file ID
+            ).href; // Get the URL string
+            console.log("Generated thumbnail URL:", thumbnailUrl);
+          } catch (thumbError) {
+            console.error("Error getting thumbnail preview:", thumbError);
+            // Keep the default fallback if preview generation fails
+          }
+        } else {
+          console.warn("Thumbnail file ID (thumbnail_id) missing from document.");
+        }
+
+        // --- Generate Channel Avatar (using fallback) ---
+        // Adjust based on how you store channel info (e.g., relation or direct attributes)
+        const channelAvatar = doc.channelProfileImageUrl // Check if a specific URL/ID is stored
+          ? doc.channelProfileImageUrl // Or logic to fetch avatar if it's an ID/relation
+          : appwriteAvatars.getInitials(doc.channelName || '?').href; // Fallback to initials generator
+
+        // --- Map Appwrite data to video state object ---
+        const fetchedVideo = {
+          id: doc.$id,
+          title: doc.title || 'Untitled Video',
+          description: doc.description || 'No description available.',
+          videoStreamUrl: videoStreamUrl, // The actual video stream URL
+          thumbnailUrl: thumbnailUrl,     // The thumbnail URL (for poster/related)
+          viewCount: doc.viewCount || 0,
+          likeCount: doc.likeCount || 0, // Assuming 'likeCount' attribute exists
+          uploadedAt: doc.$createdAt,    // Use Appwrite's creation timestamp
+          channel: {
+            // Adjust attribute names based on your Appwrite collection schema
+            id: doc.channelId || `channel-${doc.$id}`, // Use 'channelId' if available
+            name: doc.channelName || 'Unknown Channel', // Use 'channelName'
+            subscriberCount: doc.subscriberCount || 0, // Use 'subscriberCount'
+            profileImageUrl: channelAvatar,
+          }
+          // Add other fields from 'doc' as needed
         };
-        setVideo(simulatedVideo);
 
-        // Simulate fetching related videos
-        const simulatedRelated = Array.from({ length: 10 }, (_, index) => ({
-          id: `related-${videoId}-${index + 1}`,
-          title: `Related React Concept ${index + 1}: State Management`,
-          thumbnailUrl: `https://picsum.photos/seed/${videoId}${300 + index}/168/94`,
-          durationSeconds: Math.floor(Math.random() * 900) + 60,
-          viewCount: Math.floor(Math.random() * 500000) + 500,
-          uploadedAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000).toISOString(),
-          channel: {
-            id: `sim-channel-${Math.floor(Math.random() * 5) + 1}`,
-            name: `Another Dev Channel ${Math.floor(Math.random() * 5) + 1}`,
-            profileImageUrl: `https://i.pravatar.cc/48?u=channelRel${Math.floor(Math.random() * 5) + 1}`
-          }
+        setVideo(fetchedVideo);
+
+        // --- Fetch Related Videos (Keep simulation for now or implement later) ---
+        // TODO: Replace with actual related videos fetch logic (e.g., based on tags, channel)
+        console.log("Setting related videos simulation (placeholder)");
+        const simulatedRelated = Array.from({ length: 5 }, (_, i) => ({
+           id: `sim-rel-${i}`, title: `Related Video ${i+1}`, thumbnailUrl: `https://picsum.photos/seed/related${i}/168/94`,
+           durationSeconds: 300+i*30, viewCount: 1000+i*500, uploadedAt: new Date().toISOString(), channel: { name: 'Related Channel', profileImageUrl: `https://i.pravatar.cc/48?u=rel${i}` }
         }));
         setRelatedVideos(simulatedRelated);
-        // --- End of simulation ---
 
       } catch (err) {
-        console.error("Error fetching video data:", err);
-        setError(err.message || "Failed to load video details.");
+        console.error("Error fetching video details:", err);
+        // Handle specific errors like Not Found (404)
+        if (err.code === 404) {
+          setError("Video not found.");
+        } else {
+          setError(err.message || "Could not load video details.");
+        }
       } finally {
         setLoading(false);
       }
@@ -99,12 +160,6 @@ const VideoDetail = () => {
       <div className="loading-container"> {/* Use same loading style as Home */}
         <div className="loading-spinner"></div>
         <p>Loading video...</p>
-         <style jsx>{`
-          /* Simplified inline style for loader */
-          .loading-container { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 60vh; color: var(--text-secondary); }
-          .loading-spinner { width: 40px; height: 40px; border: 4px solid var(--light-gray); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        `}</style>
       </div>
     );
   }
@@ -115,12 +170,6 @@ const VideoDetail = () => {
         <h2>Error Loading Video</h2>
         <p>{error}</p>
         <Link to="/" className="btn-primary">Go Home</Link>
-         <style jsx>{`
-          .error-container { padding: 40px 20px; text-align: center; color: var(--primary); background-color: #fff0f0; border: 1px solid var(--primary-light); border-radius: 8px; margin: 20px; }
-          .error-container h2 { margin-bottom: 10px; }
-          .error-container p { color: var(--text-secondary); margin-bottom: 20px; }
-          .btn-primary { display: inline-block; text-decoration: none; } /* Style for link button */
-        `}</style>
       </div>
     );
   }
@@ -142,14 +191,26 @@ const VideoDetail = () => {
       <div className="video-content-column">
         {/* Video Player */}
         <div className="video-player-container">
-          <iframe
-            src={video.videoUrl}
-            title={video.title}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            className="video-player"
-          ></iframe>
+          {video.videoStreamUrl ? (
+            <video
+              key={video.id} // Add key to help React re-render if src changes
+              src={video.videoStreamUrl} // Use the fetched Appwrite video URL
+              controls // Show native player controls
+              poster={video.thumbnailUrl} // Use the fetched Appwrite thumbnail URL
+              preload="metadata" // Hint browser to load dimensions, duration etc.
+              className="video-player" // Apply existing styling
+              width="100%" // Ensure responsiveness
+              height="auto"
+              // Consider adding playsInline for mobile browsers
+            >
+              Your browser does not support the video tag.
+            </video>
+          ) : (
+            // Display a placeholder or error if the video URL couldn't be generated
+            <div className="video-player-error">
+              Video playback is unavailable.
+            </div>
+          )}
         </div>
 
         {/* Video Info */}
@@ -196,17 +257,17 @@ const VideoDetail = () => {
         {/* Channel Info and Description Box */}
         <div className="channel-description-box">
             <div className="channel-header">
-                <Link to={`/channel/${video.channel.id}`} className="channel-avatar-link">
+                <a href="#" className="channel-avatar-link">
                     <img
                       src={video.channel.profileImageUrl}
                       alt={`${video.channel.name} avatar`}
                       className="channel-avatar"
                     />
-                </Link>
+                </a>
                 <div className="channel-details">
-                    <Link to={`/channel/${video.channel.id}`} className="channel-name-link">
+                    <a href="#" className="channel-name-link">
                         {video.channel.name}
-                    </Link>
+                    </a>
                     <p className="channel-subscribers">{formatViews(video.channel.subscriberCount)} subscribers</p>
                 </div>
                 {/* TODO: Add dynamic Subscribe button state */}
@@ -242,72 +303,6 @@ const VideoDetail = () => {
         </div>
       </div>
 
-       {/* Inline styles specific to VideoDetail layout */}
-       <style jsx>{`
-          .video-content-column {
-              /* Takes up the main space */
-              min-width: 0; /* Prevent overflow */
-          }
-          .related-videos-column {
-              /* Takes up the sidebar space */
-              min-width: 0; /* Prevent overflow */
-          }
-          .video-player {
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 100%;
-              height: 100%;
-          }
-           .channel-description-box {
-              background-color: var(--light-gray);
-              border-radius: 12px;
-              padding: 16px;
-              margin-top: 16px;
-           }
-           .channel-name-link {
-              text-decoration: none;
-              color: var(--text);
-              font-weight: 500;
-              display: inline-block; /* Ensure hover works */
-           }
-           .channel-name-link:hover {
-               /* Optional: add hover effect */
-           }
-           .video-description {
-              margin-top: 12px; /* Space above description */
-              font-size: 14px;
-              line-height: 1.6;
-           }
-           .description-toggle-btn {
-               background: none;
-               border: none;
-               color: var(--text-secondary);
-               font-weight: 500;
-               cursor: pointer;
-               padding: 4px 0; /* Clickable area */
-               margin-top: 8px;
-               display: block; /* Full width */
-           }
-           .description-toggle-btn:hover {
-               color: var(--text);
-           }
-
-           /* Responsive adjustments directly in component for simplicity */
-           @media (max-width: 1024px) { /* Adjust breakpoint as needed */
-               .video-detail-container {
-                   grid-template-columns: 1fr; /* Stack columns */
-               }
-               .related-videos-column {
-                   margin-top: 24px; /* Add space when stacked */
-               }
-               .related-list { /* Change related list to grid on stack */
-                   display: grid;
-                   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                   gap: 16px;
-               }
-           }
-       `}</style>
     </div>
   );
 };

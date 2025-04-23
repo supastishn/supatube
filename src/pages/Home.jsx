@@ -45,6 +45,7 @@ const Home = () => {
             // --- Initialize Channel Info (using denormalized data as initial fallback) ---
             let channelName = doc.channelName || 'Unknown Channel';
             let channelAvatarUrl = doc.channelProfileImageUrl || null;
+            let channelBio = ''; // Initialize bio
 
             // --- Fetch Creator Details if ID exists ---
             if (creatorId) {

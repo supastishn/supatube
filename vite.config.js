@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     open: false // Disable auto-opening browser
-  }
+  },
   base: '/vite-deploy-demo/'
 })

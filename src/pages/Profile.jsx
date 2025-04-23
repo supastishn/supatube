@@ -78,7 +78,7 @@ const Profile = () => {
     };
 
     fetchProfileData();
-  }, [userId, authLoading]); // Re-run effect if userId or authLoading changes
+  }, [userId]); // Re-run effect if userId changes
 
   if (loading) {
     return <div className="loading-container">Loading profile...</div>; // Use shared loading style

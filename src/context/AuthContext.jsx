@@ -77,7 +77,8 @@ export const AuthProvider = ({ children }) => {
             userId, // Use the new user's ID as the document ID
             {
               bio: '', // Initialize bio as empty
-              profileImageUrl: profileImageUrl?.trim() || null // Store provided URL or null
+              profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
+              name: name // Store the provided name
             },
             [
               Permission.read(Role.user(userId)), // User can read their own doc

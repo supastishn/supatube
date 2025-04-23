@@ -39,17 +39,25 @@ const Account = () => {
         nameUpdated = true;
       }
 
-      // Update 'accounts' document if bio or profileImageUrl changed
+      // Check if any of the details (name, bio, image) need DB update/creation
       const bioChanged = bio !== (user?.bio || '');
       const imageUrlChanged = profileImageUrl !== (user?.profileImageUrl || '');
+      const nameChanged = name !== (user?.name || '');
 
-      if (bioChanged || imageUrlChanged) {
+      if (bioChanged || imageUrlChanged || nameChanged || nameUpdated) {
+        // Prepare the data object with all current profile fields
+        const accountDataPayload = {
+          name: name, // Always include the current name state
+          bio: bio,
+          profileImageUrl: profileImageUrl
+        };
+        
         try {
           await databases.updateDocument(
             appwriteConfig.databaseId,
             appwriteConfig.accountsCollectionId,
             user.$id,
-            { bio: bio, profileImageUrl: profileImageUrl }
+            accountDataPayload
           );
           detailsUpdated = true;
         } catch (docError) {
@@ -60,7 +68,7 @@ const Account = () => {
                 appwriteConfig.databaseId,
                 appwriteConfig.accountsCollectionId,
                 user.$id, // Use user's ID as document ID
-                { bio: bio, profileImageUrl: profileImageUrl }, // Data to save
+                accountDataPayload, // Use the combined payload
                 [
                   Permission.read(Role.user(user.$id)),   // User can read their own doc
                   Permission.update(Role.user(user.$id)), // User can update their own doc

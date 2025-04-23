@@ -7,5 +7,5 @@ export default defineConfig({
   server: {
     open: false // Disable auto-opening browser
   },
-  base: '/vite-deploy-demo/'
+  base: '/supatube/'
 })

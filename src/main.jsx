@@ -11,7 +11,7 @@ import eruda from 'eruda';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Router>
+    <Router basename="/supatube">
       <AuthProvider>
         <App />
       </AuthProvider>

@@ -1,130 +1,148 @@
 import { Client, Databases, Query } from 'node-appwrite';
 
+// --- Top-Level Scope ---
+
 // Helper function to extract User ID from permissions array
 const getOwnerId = (permissions) => {
   if (!permissions || !Array.isArray(permissions)) {
     return null;
   }
   for (const perm of permissions) {
-    // Look for the standard 'delete("user:...")' permission string
     if (perm.startsWith('delete("user:') && perm.endsWith('")')) {
       return perm.substring('delete("user:'.length, perm.length - '")'.length);
     }
   }
-  return null; // Return null if no owner delete permission found
+  return null;
 };
 
-// Main function entry point
-export default async ({ req, res, log, error }) => {
-  // --- 1. Get Environment Variables & Initialize Appwrite Client ---
-  const {
-    APPWRITE_FUNCTION_ENDPOINT,
-    APPWRITE_FUNCTION_PROJECT_ID,
-    APPWRITE_FUNCTION_API_KEY, // API Key with necessary permissions
-    APPWRITE_DATABASE_ID,
-    LIKES_COLLECTION_ID,
-  } = process.env;
+// --- 1. Get Environment Variables & Initialize Client (Top Level) ---
+// IMPORTANT: This code runs when the function instance *starts*, not necessarily on every trigger.
+console.log('[Top Level] Initializing function instance...');
 
-  // Basic validation
-  if (!APPWRITE_FUNCTION_ENDPOINT || !APPWRITE_FUNCTION_PROJECT_ID || !APPWRITE_FUNCTION_API_KEY || !APPWRITE_DATABASE_ID || !LIKES_COLLECTION_ID) {
-    error('FATAL: Missing required environment variables.');
-    // Cannot proceed without configuration
-    return res.json({ success: false, message: 'Configuration error: Missing environment variables.' }, 500);
-  }
+const {
+  APPWRITE_FUNCTION_ENDPOINT,
+  APPWRITE_FUNCTION_PROJECT_ID,
+  APPWRITE_FUNCTION_API_KEY, // NOTE: Consider a dedicated, long-lived API key for subscriptions outside standard execution.
+  APPWRITE_DATABASE_ID,
+  LIKES_COLLECTION_ID,
+} = process.env;
 
-  const client = new Client()
-    .setEndpoint(APPWRITE_FUNCTION_ENDPOINT)
-    .setProject(APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(APPWRITE_FUNCTION_API_KEY); // Use a long-lived API key with documents read/write permissions
+// Basic validation at the top level
+if (!APPWRITE_FUNCTION_ENDPOINT || !APPWRITE_FUNCTION_PROJECT_ID || !APPWRITE_FUNCTION_API_KEY || !APPWRITE_DATABASE_ID || !LIKES_COLLECTION_ID) {
+  const errorMsg = 'FATAL: Missing required environment variables. Function cannot start.';
+  console.error(`[Top Level] ${errorMsg}`);
+  // Throwing an error here might prevent the function instance from becoming ready or cause deployment issues.
+  throw new Error(errorMsg);
+} else {
+    console.log('[Top Level] Environment variables loaded successfully.');
+}
 
-  const databases = new Databases(client);
+const client = new Client()
+  .setEndpoint(APPWRITE_FUNCTION_ENDPOINT)
+  .setProject(APPWRITE_FUNCTION_PROJECT_ID)
+  .setKey(APPWRITE_FUNCTION_API_KEY);
 
-  // --- 2. Define the Subscription Logic ---
-  const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${LIKES_COLLECTION_ID}.documents`;
-  const event = `databases.${APPWRITE_DATABASE_ID}.collections.${LIKES_COLLECTION_ID}.documents.*.create`;
+const databases = new Databases(client);
 
-  log(`Attempting to subscribe to channel: ${channel}`);
+// --- 2. Define and Start Subscription Logic (Top Level) ---
+const channel = `databases.${APPWRITE_DATABASE_ID}.collections.${LIKES_COLLECTION_ID}.documents`;
+const eventPattern = `databases.${APPWRITE_DATABASE_ID}.collections.${LIKES_COLLECTION_ID}.documents.*.create`;
 
-  try {
-    client.subscribe(channel, async (response) => {
-      // Check if the event is a document creation event
-      if (response.events.includes(event)) {
-        log(`Received create event for document ID: ${response.payload.$id}`);
-        const newLikeDoc = response.payload; // Payload IS the document
+console.log(`[Top Level] Attempting to subscribe to channel: ${channel}`);
 
-        // --- Extract Necessary Data ---
-        const videoId = newLikeDoc.videoId;
-        const newDocumentId = newLikeDoc.$id;
-        const permissions = newLikeDoc.$permissions;
-        const ownerUserId = getOwnerId(permissions);
+try {
+  // This subscription attempt runs when the function container initializes.
+  client.subscribe(channel, async (response) => {
+    // Use console.log/error here as the 'log'/'error' context objects aren't available.
+    try {
+        // Check if the event is a document creation event
+        if (response.events.includes(eventPattern)) {
+            console.log(`[Subscription] Received create event for document ID: ${response.payload.$id}`);
+            const newLikeDoc = response.payload; // Payload IS the document
 
-        if (!videoId) {
-          error(`[Subscription] Missing 'videoId' in payload for doc ${newDocumentId}.`);
-          return; // Skip processing this event
-        }
-        if (!ownerUserId) {
-          error(`[Subscription] Could not determine owner for doc ${newDocumentId}.`);
-          return; // Skip processing this event
-        }
+            // --- Extract Necessary Data ---
+            const videoId = newLikeDoc.videoId;
+            const newDocumentId = newLikeDoc.$id;
+            const permissions = newLikeDoc.$permissions;
+            const ownerUserId = getOwnerId(permissions);
 
-        log(`[Subscription] Processing: VideoID=${videoId}, OwnerID=${ownerUserId}, NewDocID=${newDocumentId}`);
-
-        // --- Find and Delete Previous Likes/Dislikes ---
-        try {
-          const query = [
-            Query.equal('videoId', videoId),
-            Query.limit(100)
-          ];
-          log(`[Subscription] Querying for previous docs with videoId: ${videoId}`);
-          const previousDocsResponse = await databases.listDocuments(
-            APPWRITE_DATABASE_ID,
-            LIKES_COLLECTION_ID,
-            query
-          );
-
-          let deletedCount = 0;
-          for (const oldDoc of previousDocsResponse.documents) {
-            if (oldDoc.$id === newDocumentId) continue; // Skip the new doc itself
-
-            const oldDocOwnerId = getOwnerId(oldDoc.$permissions);
-            if (oldDocOwnerId === ownerUserId) {
-              log(`[Subscription] Found previous doc ${oldDoc.$id} by same user ${ownerUserId}. Deleting...`);
-              try {
-                await databases.deleteDocument(APPWRITE_DATABASE_ID, LIKES_COLLECTION_ID, oldDoc.$id);
-                log(`[Subscription] Successfully deleted previous doc ${oldDoc.$id}.`);
-                deletedCount++;
-              } catch (deleteError) {
-                error(`[Subscription] Failed to delete doc ${oldDoc.$id}: ${deleteError.message || deleteError}`);
-              }
+            if (!videoId) {
+                console.error(`[Subscription] Skipping ${newDocumentId}: Missing 'videoId' in payload.`);
+                return;
             }
-          }
-          log(`[Subscription] Finished processing ${newDocumentId}. Deleted ${deletedCount} previous doc(s).`);
+            if (!ownerUserId) {
+                console.error(`[Subscription] Skipping ${newDocumentId}: Could not determine owner. Permissions: ${JSON.stringify(permissions)}`);
+                return;
+            }
 
-        } catch (processingError) {
-          error(`[Subscription] Error processing event for ${newDocumentId}: ${processingError.message || processingError}`);
+            console.log(`[Subscription] Processing: VideoID=${videoId}, OwnerID=${ownerUserId}, NewDocID=${newDocumentId}`);
+
+            // --- Find and Delete Previous Likes/Dislikes ---
+            const query = [
+                Query.equal('videoId', videoId),
+                Query.limit(100) // Limit query results for performance
+            ];
+            console.log(`[Subscription] Querying for previous docs with videoId: ${videoId}, excluding ${newDocumentId}`);
+
+            const previousDocsResponse = await databases.listDocuments(
+                APPWRITE_DATABASE_ID,
+                LIKES_COLLECTION_ID,
+                query
+            );
+
+            let deletedCount = 0;
+            for (const oldDoc of previousDocsResponse.documents) {
+                // Skip the document that just triggered this subscription event
+                if (oldDoc.$id === newDocumentId) continue;
+
+                const oldDocOwnerId = getOwnerId(oldDoc.$permissions);
+                // Delete only if the previous document belongs to the *same user*
+                if (oldDocOwnerId === ownerUserId) {
+                    console.log(`[Subscription] Found previous doc ${oldDoc.$id} by same user ${ownerUserId}. Deleting...`);
+                    try {
+                        await databases.deleteDocument(APPWRITE_DATABASE_ID, LIKES_COLLECTION_ID, oldDoc.$id);
+                        console.log(`[Subscription] Successfully deleted previous doc ${oldDoc.$id}.`);
+                        deletedCount++;
+                    } catch (deleteError) {
+                        console.error(`[Subscription] Failed to delete doc ${oldDoc.$id}: ${deleteError.message || deleteError}`);
+                    }
+                } else {
+                     // Log if a doc for the same video is found but owner doesn't match (useful for debugging)
+                     // console.log(`[Subscription] Skipping doc ${oldDoc.$id} - owner mismatch (Expected: ${ownerUserId}, Found: ${oldDocOwnerId})`);
+                }
+            }
+            console.log(`[Subscription] Finished processing ${newDocumentId}. Deleted ${deletedCount} previous doc(s).`);
+
+        } else {
+            // Log other event types received on this channel if needed for debugging
+            // console.log(`[Subscription] Received other event types: ${response.events.join(', ')}`);
         }
-      } else {
-        // Log other events received on the channel if needed for debugging
-        // log(`Received other event: ${response.events.join(', ')}`);
-      }
-    });
+    } catch (processingError) {
+        // Catch errors within the async subscription handler
+        console.error(`[Subscription] Error processing event payload for ${response?.payload?.$id || 'unknown doc'}: ${processingError.message || processingError}`);
+    }
+  });
 
-    log(`Subscription to ${channel} initiated. **WARNING: This connection will likely be terminated soon due to function timeouts.**`);
+  console.log(`[Top Level] Subscription to ${channel} initiated successfully. **WARNING: Persistence of this subscription is NOT guaranteed by the Appwrite runtime.**`);
 
-    // --- 3. Return Response (Function Execution Completes Here) ---
-    // The function execution ENDS after returning this response.
-    // The subscription started above will only run until the function times out.
-    return res.json({
-      success: true,
-      message: `Subscription attempt initiated. This is NOT a reliable long-term solution. Use Event Triggers instead.`
-    }, 200);
+} catch (subscribeError) {
+  // Catch errors during the initial client.subscribe call
+  console.error(`[Top Level] FATAL: Failed to initiate subscription: ${subscribeError.message || subscribeError}`);
+  // Throw error to potentially signal deployment/startup failure
+  throw new Error(`Failed to initiate subscription: ${subscribeError.message}`);
+}
 
-  } catch (subscribeError) {
-    error(`Failed to initiate subscription: ${subscribeError.message || subscribeError}`);
-    return res.json({ success: false, message: `Failed to initiate subscription: ${subscribeError.message}` }, 500);
-  }
+// --- 3. Exported Default Function (Minimal) ---
+// This function still gets called if an event trigger is configured or if executed manually.
+// It does NOT interact with the subscription logic above, which runs "in the background"
+// within the Node.js process of the function instance (until the instance is terminated).
+export default async ({ req, res, log, error }) => {
+  log('Function execution handler triggered (e.g., by event, schedule, or manually).');
 
-  // NOTE: Code placed here will likely never be reached if the subscription starts successfully.
-  // The function needs to stay alive to keep the subscription running, which it won't do
-  // after returning the response above. This highlights the architectural mismatch.
+  // The main like processing logic is intended to run in the top-level subscription.
+  // This handler just acknowledges the trigger.
+  return res.json({
+    success: true,
+    message: 'Function execution handler completed. Like processing occurs in background subscription (if active and stable).'
+  }, 200);
 };

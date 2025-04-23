@@ -46,37 +46,43 @@ const Home = () => {
             let channelName = doc.channelName || 'Unknown Channel';
             let channelAvatarUrl = doc.channelProfileImageUrl || null;
             let channelBio = ''; // Initialize bio
+            let creatorAccountNameFallback = null; // Variable to store name from account.get if needed
 
             // --- Fetch Creator Details if ID exists ---
             if (creatorId) {
-                console.log(`[Home/${doc.$id}] Attempting to fetch account for creatorId: ${creatorId}`);
+                console.log(`[Home/${doc.$id}] Attempting to fetch account details from DB for creatorId: ${creatorId}`);
+                // --- PRIMARY: Fetch account details (name, bio, profileImageUrl) from 'accounts' collection ---
                 try {
-                    const creatorAccount = await account.get(creatorId);
-                    console.log(`[Home/${doc.$id}] Fetched account:`, creatorAccount); // Log fetched account
-                    channelName = creatorAccount.name || channelName; // Prioritize fetched name
-                    console.log(`[Home/${doc.$id}] Channel name after fetch: '${channelName}' (Used: ${creatorAccount.name ? 'Fetched' : 'Fallback'})`);
+                   const accountDetailsDoc = await databases.getDocument(
+                     appwriteConfig.databaseId,
+                     appwriteConfig.accountsCollectionId,
+                     creatorId
+                   );
+                   console.log(`[Home/${doc.$id}] Fetched account details document:`, accountDetailsDoc);
+                   channelName = accountDetailsDoc.name || channelName; // Prioritize name from DB doc
+                   channelBio = accountDetailsDoc.bio || ''; // Get bio
+                   // Use DB profile image URL if available and no video-specific denormalized one exists
+                   if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                       channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                       console.log(`[Home/${doc.$id}] Using profile image URL from accounts collection: ${channelAvatarUrl}`);
+                   }
+                   console.log(`[Home/${doc.$id}] Channel name set from DB doc: '${channelName}'`);
 
-                    // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
-                    try {
-                      const accountDetailsDoc = await databases.getDocument(
-                        appwriteConfig.databaseId,
-                        appwriteConfig.accountsCollectionId,
-                        creatorId
-                      );
-                      // Use fetched profile image URL if available and no video-specific denormalized one exists
-                      if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
-                          channelAvatarUrl = accountDetailsDoc.profileImageUrl;
-                          console.log(`[Home/${doc.$id}] Using profile image URL from accounts collection: ${channelAvatarUrl}`);
-                      }
-                      channelBio = accountDetailsDoc.bio || ''; // Get bio
-                    } catch (detailsError) {
-                       if (detailsError.code !== 404) console.warn(`[Home/${doc.$id}] Could not fetch account details for creator ${creatorId}:`, detailsError);
-                       // Proceed without details, falling back to initials/defaults
+                } catch (detailsError) {
+                   if (detailsError.code === 404) {
+                     console.warn(`[Home/${doc.$id}] No account details document found for creator ${creatorId}. Falling back.`);
+                     // FALLBACK: Try fetching the core Appwrite account name if DB doc fails
+                     try {
+                       const creatorAccount = await account.get(creatorId);
+                       creatorAccountNameFallback = creatorAccount.name;
+                       channelName = creatorAccountNameFallback || channelName; // Use core account name as fallback
+                       console.log(`[Home/${doc.$id}] Channel name set from account.get fallback: '${channelName}'`);
+                     } catch (accountGetError) {
+                       console.warn(`[Home/${doc.$id}] Could not fetch core account details for creator ${creatorId}:`, accountGetError);
+                     }
+                   } else {
+                     console.warn(`[Home/${doc.$id}] Error fetching account details document for creator ${creatorId}:`, detailsError);
                     }
-                } catch (userFetchError) {
-                    // Handle or log error fetching user details (e.g., permissions issue)
-                    console.warn(`[Home/${doc.$id}] Could not fetch details for creator ${creatorId}:`, userFetchError);
-                    // Continue with potentially denormalized data
                 }
             }
 

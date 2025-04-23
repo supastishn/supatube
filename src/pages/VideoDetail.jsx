@@ -318,17 +318,17 @@ const VideoDetail = () => {
         {/* Channel Info and Description Box */}
         <div className="channel-description-box">
             <div className="channel-header">
-                <a href="#" className="channel-avatar-link">
+                <Link to={`/profile/${video.channel.creatorUserId || 'unknown-user'}`} className="channel-avatar-link"> {/* Link the avatar */}
                     <img
                       src={video.channel.profileImageUrl}
                       alt={`${video.channel.name} avatar`}
                       className="channel-avatar"
                     />
-                </a>
+                </Link>
                 <div className="channel-details">
-                    <a href="#" className="channel-name-link">
+                    <Link to={`/profile/${video.channel.creatorUserId || 'unknown-user'}`} className="channel-name-link">
                         {video.channel.name}
-                    </a>
+                    </Link>
                     <p className="channel-subscribers">{formatViews(video.channel.subscriberCount)} subscribers</p>
                 </div>
                 {/* TODO: Add dynamic Subscribe button state */}

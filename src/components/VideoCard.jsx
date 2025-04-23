@@ -92,7 +92,7 @@ const VideoCard = ({ video, isRelated = false }) => {
       <div className="video-info">
         {/* Channel Avatar (only for grid layout) */}
         {!isRelated && (
-          <Link to={`/profile/${creatorUserId || channelId}`} className="channel-avatar-link">
+          <Link to={`/profile/${creatorUserId || 'default-user-id'}`} className="channel-avatar-link" title={name}> {/* Use creatorUserId preferentially */}
              <img
                src={profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '?')}&background=random`}
                alt={`${name || 'Channel'} avatar`}
@@ -107,7 +107,7 @@ const VideoCard = ({ video, isRelated = false }) => {
           <Link to={`/videos/${id}`} className="video-title-link" title={title}>
             <h3 className="video-title">{title}</h3>
           </Link>
-          <Link to={`/profile/${creatorUserId || channelId}`} className="channel-name-link" title={name}>
+          <Link to={`/profile/${creatorUserId || 'default-user-id'}`} className="channel-name-link" title={name}> {/* Use creatorUserId preferentially */}
             {name || 'Unknown Channel'}
           </Link>
           <div className="video-stats">

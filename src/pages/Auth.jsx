@@ -111,6 +111,7 @@ const Auth = ({ type }) => {
               aria-label="Username"
               placeholder="Choose a unique username"
             />
+          </div>
         )}
         {/* Add Profile Image URL input only for Sign Up */}
         {!isSignin && (

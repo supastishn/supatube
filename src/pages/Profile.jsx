@@ -41,17 +41,27 @@ const Profile = () => {
         setUserData(userDoc); // Contains name, bio, profileImageUrl etc.
 
         // 2. Fetch User's Videos (from 'videos' collection)
-        // Assuming 'videos' collection has a 'creatorId' attribute matching the user's $id
-        // IMPORTANT: This requires the 'creatorId' attribute to be added during video upload.
+        // Filter videos based on document permissions rather than creatorId
         const videoResponse = await databases.listDocuments(
           appwriteConfig.databaseId,
           appwriteConfig.videosCollectionId,
           [
-            Query.equal('creatorId', userId), // Filter by the profile user's ID
-            Query.orderDesc('$createdAt')     // Show newest videos first
+            // No creatorId filter here - we'll filter client-side based on permissions
+            Query.orderDesc('$createdAt'),   // Show newest videos first
+            Query.limit(100)                 // Limit to avoid excessive data transfer
           ]
         );
-        setUserVideos(videoResponse.documents);
+        
+        // Filter documents client-side based on delete permission for the profile user
+        const userOwnedVideos = videoResponse.documents.filter(doc => {
+          // Check if the userId has a delete permission in the document
+          return doc.$permissions.some(perm => {
+            const deletePermRegex = new RegExp(`^delete\\("user:${userId}"\\)$`);
+            return deletePermRegex.test(perm);
+          });
+        });
+        
+        setUserVideos(userOwnedVideos);
 
       } catch (err) {
         console.error("Error fetching profile data:", err);

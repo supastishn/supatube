@@ -112,24 +112,35 @@ const Profile = () => {
          <h2>{isOwnProfile ? "Your Videos" : "Uploaded Videos"}</h2>
          {userVideos.length > 0 ? (
             <div className="videos-grid"> {/* Use videos-grid class from App.css */}
-              {userVideos.map((video) => (
-                <VideoCard key={video.$id} video={{
-                  id: video.$id,
-                  title: video.title || 'Untitled Video', 
-                  thumbnailUrl: video.thumbnail_id ? 
-                    storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id).href : 
-                    'https://via.placeholder.com/320x180?text=No+Thumbnail',
-                  durationSeconds: video.video_duration || 0,
-                  viewCount: video.viewCount || 0,
-                  uploadedAt: video.$createdAt,
-                  channel: {
-                    id: userId,
-                    name: userData.name || 'Unknown User',
-                    profileImageUrl: userData.profileImageUrl,
-                    creatorUserId: userId
-                  }
-                }} />
-              ))}
+              {userVideos.map((video) => {
+                // --- DEBUG PRINTS ---
+                const thumbnailUrl = video.thumbnail_id ? 
+                  storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id).href : 
+                  'https://via.placeholder.com/320x180?text=No+Thumbnail';
+                const channelName = userData.name || 'Unknown User';
+                console.log(`[Profile/${video.$id}] Thumbnail URL: ${thumbnailUrl}`);
+                console.log(`[Profile/${video.$id}] Channel Name: ${channelName}`);
+                console.log(`[Profile/${video.$id}] Channel profileImageUrl (from userData): ${userData.profileImageUrl}`);
+                // --- END DEBUG PRINTS ---
+                return (
+                  <VideoCard key={video.$id} video={{
+                    id: video.$id,
+                    title: video.title || 'Untitled Video', 
+                    thumbnailUrl: video.thumbnail_id ? 
+                      storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id).href : 
+                      'https://via.placeholder.com/320x180?text=No+Thumbnail',
+                    durationSeconds: video.video_duration || 0,
+                    viewCount: video.viewCount || 0,
+                    uploadedAt: video.$createdAt,
+                    channel: {
+                      id: userId,
+                      name: userData.name || 'Unknown User',
+                      profileImageUrl: userData.profileImageUrl,
+                      creatorUserId: userId
+                    }
+                  }} />
+                );
+              })}
             </div>
           ) : (
             <p>{isOwnProfile ? "You haven't uploaded any videos yet." : "This user hasn't uploaded any videos yet."}</p>

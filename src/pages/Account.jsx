@@ -6,6 +6,7 @@ import { Permission, Role } from 'appwrite'; // Add Permission and Role
 
 const Account = () => {
   const { user, account, updateUserProfile, logout } = useAuth(); // Get user, account obj, update function, and logout
+  const [username, setUsername] = useState(''); // Add username state
   const [name, setName] = useState('');
   const [bio, setBio] = useState(''); // Renamed from description to bio
   const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
@@ -17,6 +18,7 @@ const Account = () => {
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setUsername(user.username || ''); // Populate username state
       // Read directly from user object properties populated by context
       setBio(user.bio || ''); // Use user.bio
       setProfileImageUrl(user.profileImageUrl || ''); // Use user.profileImageUrl
@@ -48,6 +50,7 @@ const Account = () => {
         // Prepare the data object with all current profile fields
         const accountDataPayload = {
           name: name, // Always include the current name state
+          username: username, // Include username
           bio: bio,
           profileImageUrl: profileImageUrl
         };
@@ -124,6 +127,19 @@ const Account = () => {
             required
             className="form-input"
           />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            value={username}
+            disabled // Make it read-only
+            readOnly
+            className="form-input disabled"
+          />
+          <small>Username cannot be changed after account creation</small>
         </div>
 
         <div className="form-group">

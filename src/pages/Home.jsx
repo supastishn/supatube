@@ -55,11 +55,22 @@ const Home = () => {
                     channelName = creatorAccount.name || channelName; // Prioritize fetched name
                     console.log(`[Home/${doc.$id}] Channel name after fetch: '${channelName}' (Used: ${creatorAccount.name ? 'Fetched' : 'Fallback'})`);
 
-                    // Use fetched profile image URL if available and no denormalized one exists
-                    const prefs = creatorAccount.prefs || {};
-                    if (prefs.profileImageUrl && !channelAvatarUrl) {
-                        channelAvatarUrl = prefs.profileImageUrl;
-                        console.log(`[Home/${doc.$id}] Using profile image URL from prefs: ${channelAvatarUrl}`);
+                    // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
+                    try {
+                      const accountDetailsDoc = await databases.getDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.accountsCollectionId,
+                        creatorId
+                      );
+                      // Use fetched profile image URL if available and no video-specific denormalized one exists
+                      if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                          channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                          console.log(`[Home/${doc.$id}] Using profile image URL from accounts collection: ${channelAvatarUrl}`);
+                      }
+                      channelBio = accountDetailsDoc.bio || ''; // Get bio
+                    } catch (detailsError) {
+                       if (detailsError.code !== 404) console.warn(`[Home/${doc.$id}] Could not fetch account details for creator ${creatorId}:`, detailsError);
+                       // Proceed without details, falling back to initials/defaults
                     }
                 } catch (userFetchError) {
                     // Handle or log error fetching user details (e.g., permissions issue)
@@ -95,7 +106,8 @@ const Home = () => {
                 id: creatorId || doc.channelId || `channel-${doc.$id}`, 
                 name: channelName, 
                 profileImageUrl: channelAvatarUrl, 
-                creatorUserId: creatorId 
+                creatorUserId: creatorId,
+                bio: channelBio // Add bio
             }); // Log final data
             
             return {
@@ -109,6 +121,7 @@ const Home = () => {
                     id: creatorId || doc.channelId || `channel-${doc.$id}`, // Use creatorId if available
                     name: channelName, // Use potentially fetched name
                     profileImageUrl: channelAvatarUrl, // Use determined avatar URL
+                    bio: channelBio, // Add bio here
                     creatorUserId: creatorId // Pass the creator user ID explicitly
                 }
             };

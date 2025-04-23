@@ -6,6 +6,7 @@ export const appwriteConfig = {
     databaseId: 'database',                  // Database ID
     videosCollectionId: 'videos',            // Videos collection ID
     storageVideosBucketId: 'videos',         // Videos storage bucket ID
+    accountsCollectionId: 'accounts',        // Accounts collection ID (NEW)
 };
 
 // Initialize Appwrite client

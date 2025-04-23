@@ -56,18 +56,30 @@ const SearchResults = () => {
             }
             if (!creatorId && doc.creatorId) { creatorId = doc.creatorId; } // Fallback
 
-            // Initialize Channel Info
+            // --- Initialize Channel Info ---
             let channelName = doc.channelName || 'Unknown Channel';
             let channelAvatarUrl = doc.channelProfileImageUrl || null;
+            let channelBio = ''; // Initialize bio
 
-            // Fetch Creator Details if ID exists
+            // --- Fetch Creator Details if ID exists ---
             if (creatorId) {
               try {
                 const creatorAccount = await account.get(creatorId);
                 channelName = creatorAccount.name || channelName;
-                const prefs = creatorAccount.prefs || {};
-                if (prefs.profileImageUrl && !channelAvatarUrl) {
-                  channelAvatarUrl = prefs.profileImageUrl;
+
+                // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
+                 try {
+                    const accountDetailsDoc = await databases.getDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.accountsCollectionId,
+                        creatorId
+                    );
+                    if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                        channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                    }
+                    channelBio = accountDetailsDoc.bio || '';
+                 } catch (detailsError) {
+                    if (detailsError.code !== 404) console.warn(`[Search/${doc.$id}] Could not fetch account details for creator ${creatorId}:`, detailsError);
                 }
               } catch (userFetchError) {
                 console.warn(`[Search/${doc.$id}] Could not fetch details for creator ${creatorId}:`, userFetchError);
@@ -106,6 +118,7 @@ const SearchResults = () => {
                 id: creatorId || doc.channelId || `channel-${doc.$id}`,
                 name: channelName,
                 profileImageUrl: channelAvatarUrl,
+                bio: channelBio, // Add bio
                 creatorUserId: creatorId // Pass the creator user ID explicitly
               }
             };

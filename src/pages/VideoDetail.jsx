@@ -37,7 +37,7 @@ const VideoDetail = () => {
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showFullBio, setShowFullBio] = useState(false); // Renamed state
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -54,11 +54,7 @@ const VideoDetail = () => {
           videoId
         );
 
-        // --- Get Creator/Channel Info ---
-        // NOTE: Assumes relevant channel info (name, subscriber count, profile image URL, creator ID)
-        // is denormalized and stored *within* the video document itself.
-        // Client-side fetching of arbitrary user details by ID is generally restricted.
-        // --> We rely on the 'creatorId' attribute being correctly set on the document during upload. <--
+        // --- Get Creator/Channel Info --- (Updated Logic)
 
         // --- Generate Video URL from Storage (using 'video_id') ---
         let videoStreamUrl = '';
@@ -99,6 +95,7 @@ const VideoDetail = () => {
         let creatorId = null;
         let creatorName = doc.channelName || 'Unknown Channel'; // Default to denormalized name
         let channelAvatarUrl = doc.channelProfileImageUrl || null; // Default to denormalized URL
+        let creatorBio = ''; // Initialize bio
 
         // Find the user ID with delete permission (usually the creator) from permissions
         const permissions = doc.$permissions || [];
@@ -125,20 +122,23 @@ const VideoDetail = () => {
                 const creatorAccount = await account.get(creatorId);
                 creatorName = creatorAccount.name || creatorName; // Use fetched name if available
 
-                // Check if a custom profile image URL is stored in user preferences
-                // Assuming prefs structure like { profileImageUrl: '...' }
-                const prefs = creatorAccount.prefs || {};
-                if (prefs.profileImageUrl && !channelAvatarUrl) { // Prioritize denormalized URL if it exists
-                   channelAvatarUrl = prefs.profileImageUrl;
+                // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
+                try {
+                   const accountDetailsDoc = await databases.getDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.accountsCollectionId,
+                        creatorId
+                   );
+                   if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                       channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                   }
+                   creatorBio = accountDetailsDoc.bio || ''; // Get bio
+                } catch (detailsError) {
+                   if (detailsError.code !== 404) console.warn(`[Detail/${videoId}] Could not fetch account details for creator ${creatorId}:`, detailsError);
                 }
 
             } catch (userFetchError) {
-                // Log error only if it's not a standard permission error (optional)
-                if (userFetchError.code !== 401 && userFetchError.code !== 403) {
-                   // Error fetching user details
-                } else {
-                   // Permission-related fetch error
-                }
+                console.warn(`[Detail/${videoId}] Could not fetch user account for creator ${creatorId}:`, userFetchError);
                 // Fallback to denormalized data (already set as defaults)
             }
         } else {
@@ -168,7 +168,8 @@ const VideoDetail = () => {
         const fetchedVideo = {
           id: doc.$id,
           title: doc.title || 'Untitled Video',
-          description: doc.description || 'No description available.',
+          description: doc.description || 'No description available.', // Keep original video description
+          bio: creatorBio || '', // Add fetched creator bio
           videoStreamUrl: videoStreamUrl, // The actual video stream URL
           thumbnailUrl: thumbnailUrl,     // The thumbnail URL (for poster/related)
           viewCount: doc.viewCount || 0,
@@ -180,6 +181,7 @@ const VideoDetail = () => {
             name: creatorName, // Use extracted name
             subscriberCount: doc.subscriberCount || 0, // Use denormalized count
             profileImageUrl: channelAvatarUrl, // Use determined avatar URL
+            bio: creatorBio, // Add bio here too if needed directly in channel object
             creatorUserId: creatorId // Explicitly store the creator's User ID
           },
           // Add other fields from 'doc' as needed
@@ -209,7 +211,7 @@ const VideoDetail = () => {
 
     fetchVideoData();
     // Reset description visibility when video ID changes
-    setShowFullDescription(false);
+    setShowFullBio(false); // Reset bio visibility
   }, [videoId]); // Re-run effect when videoId changes
 
   // --- Render States ---
@@ -239,10 +241,10 @@ const VideoDetail = () => {
 
   // --- Successful Render ---
 
-  // Prepare description display
-  const descriptionLines = video.description.split('\n');
-  const showToggleButton = descriptionLines.length > 3; // Show toggle if more than 3 lines
-  const displayedDescription = showFullDescription ? video.description : descriptionLines.slice(0, 3).join('\n');
+  // Prepare bio display
+  const bioLines = (video.channel.bio || '').split('\n'); // Use bio from channel object
+  const showBioToggleButton = bioLines.length > 3 && video.channel.bio.length > 150; // Show toggle if long enough
+  const displayedBio = showFullBio ? video.channel.bio : bioLines.slice(0, 3).join('\n');
 
   return (
     <div className="video-detail-container">
@@ -335,13 +337,13 @@ const VideoDetail = () => {
 
             {/* Video Description */}
             <div className="video-description">
-                <p style={{ whiteSpace: 'pre-wrap' }}>{displayedDescription}</p>
-                {showToggleButton && (
+                <p style={{ whiteSpace: 'pre-wrap' }}>{displayedBio || 'No bio available.'}</p>
+                {showBioToggleButton && (
                     <button
                         className="description-toggle-btn"
-                        onClick={() => setShowFullDescription(!showFullDescription)}
+                        onClick={() => setShowFullBio(!showFullBio)}
                     >
-                        {showFullDescription ? 'Show less' : 'Show more'}
+                        {showFullBio ? 'Show less' : 'Show more'}
                     </button>
                 )}
             </div>

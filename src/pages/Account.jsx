@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { databases } from '../lib/appwriteConfig';
+import { appwriteConfig } from '../lib/appwriteConfig';
 
 const Account = () => {
   const { user, account, updateUserProfile } = useAuth(); // Get user, account obj, and update function
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [bio, setBio] = useState(''); // Renamed from description to bio
   const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,9 +16,9 @@ const Account = () => {
   useEffect(() => {
     if (user) {
       setName(user.name || '');
-      // Preferences are nested under 'prefs' object we added in context
-      setDescription(user.prefs?.description || '');
-      setProfileImageUrl(user.prefs?.profileImageUrl || ''); // Populate profile image URL from prefs
+      // Read directly from user object properties populated by context
+      setBio(user.bio || ''); // Use user.bio
+      setProfileImageUrl(user.profileImageUrl || ''); // Use user.profileImageUrl
     }
   }, [user]); // Re-run effect if user object changes
 
@@ -26,33 +28,34 @@ const Account = () => {
     setError('');
     setSuccess('');
 
-    let profileUpdated = false; // Flag to track if anything was updated
+    let nameUpdated = false;
+    let detailsUpdated = false;
 
     try {
       // Update name if it has changed
-      if (name !== user.name) {
+      if (name !== (user?.name || '')) {
         await account.updateName(name);
-        profileUpdated = true;
+        nameUpdated = true;
       }
 
-      // Update preferences (description, profileImageUrl) if they have changed
-      // Fetch current prefs first to avoid overwriting others if they exist
-      const currentPrefs = await account.getPrefs();
-      const descriptionChanged = description !== (currentPrefs?.description || '');
-      const imageUrlChanged = profileImageUrl !== (currentPrefs?.profileImageUrl || '');
+      // Update 'accounts' document if bio or profileImageUrl changed
+      const bioChanged = bio !== (user?.bio || '');
+      const imageUrlChanged = profileImageUrl !== (user?.profileImageUrl || '');
 
-      if (descriptionChanged || imageUrlChanged) {
-          await account.updatePrefs({
-            ...currentPrefs, // Keep existing preferences
-            description: description, // Update/add description
-            profileImageUrl: profileImageUrl // Update/add profileImageUrl
-          });
+      if (bioChanged || imageUrlChanged) {
+        await databases.updateDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.accountsCollectionId,
+          user.$id,
+          { bio: bio, profileImageUrl: profileImageUrl }
+        );
+        detailsUpdated = true;
       }
 
-      // Refresh the user state in the context
+      // Refresh the user state in the context to reflect changes
       await updateUserProfile();
 
-      if (profileUpdated || descriptionChanged || imageUrlChanged) {
+      if (nameUpdated || detailsUpdated) {
           setSuccess('Account updated successfully!');
       } // Only show success if something actually changed
 
@@ -102,11 +105,11 @@ const Account = () => {
         </div>
 
         <div className="form-group">
-          <label htmlFor="description">Description</label>
+          <label htmlFor="bio">Bio</label>
           <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            id="bio"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
             rows="4"
             placeholder="Tell us a bit about yourself or your channel"
             className="form-textarea"
@@ -126,7 +129,7 @@ const Account = () => {
           <small>Provide a URL to your desired profile picture.</small>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary">
+        <button type="submit" disabled={loading || !user} className="btn-primary">
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
       </form>

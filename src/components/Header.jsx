@@ -72,7 +72,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
               <div className="avatar-dropdown">
                 <Link to="/account" aria-label="Account Settings">
                   <img
-                    src={user?.prefs?.profileImageUrl || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
+                    src={user?.profileImageUrl || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
                     alt="User avatar"
                     className="avatar-img"
                   />
@@ -80,7 +80,7 @@ const Header = ({ toggleSidebar, isMobile }) => {
                 <div className="dropdown-menu">
                   <div className="dropdown-header">
                     <img 
-                      src={user?.prefs?.profileImageUrl || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
+                      src={user?.profileImageUrl || `https://cloud.appwrite.io/v1/avatars/initials?name=${encodeURIComponent(user?.name || user?.email || 'User')}`}
                       alt="User" 
                       className="dropdown-avatar" 
                     />

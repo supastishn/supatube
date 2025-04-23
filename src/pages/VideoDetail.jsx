@@ -54,14 +54,15 @@ const VideoDetail = () => {
           videoId
         );
 
-        // --- Get Creator/Channel Info --- (Updated Logic)
-
         // --- Generate Video URL from Storage (using 'video_id') ---
         let videoStreamUrl = '';
         if (doc.video_id) { // Use video_id attribute name
           try {
             // Use getFileView for direct streaming URL
-            videoStreamUrl = storage.getFileView(
+            // Use getFileDownload if getFileView isn't working as expected or for explicit download trigger
+            // For streaming, getFileView is generally preferred if permissions allow public read.
+            // Let's stick with getFileView for now.
+            videoStreamUrl = storage.getFileView( // Or getFileDownload
               appwriteConfig.storageVideosBucketId,
               doc.video_id // Use the video file ID
             ); // Get the URL string
@@ -91,13 +92,11 @@ const VideoDetail = () => {
             console.log(`[DetailThumb/${videoId}] Using fallback thumbnail.`);
         }
 
-        // --- Determine Channel Avatar & Creator ID ---
+        // --- Determine Creator ID ---
         let creatorId = null;
-        let creatorName = doc.channelName || 'Unknown Channel'; // Default to denormalized name
-        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Default to denormalized URL
-        let creatorBio = ''; // Initialize bio
-
+        
         // Find the user ID with delete permission (usually the creator) from permissions
+        console.log(`[Detail/${videoId}] Permissions:`, doc.$permissions);
         const permissions = doc.$permissions || [];
         const deletePermissionRegex = /^delete\("user:(.+)"\)$/; // Regex to extract user ID
 
@@ -109,37 +108,54 @@ const VideoDetail = () => {
             }
         }
 
+        console.log(`[Detail/${videoId}] Creator ID from permissions:`, creatorId);
+
         // If creatorId wasn't found via permissions, try the denormalized attribute as a fallback
         if (!creatorId && doc.creatorId) {
              creatorId = doc.creatorId;
+             console.log(`[Detail/${videoId}] Creator ID from doc.creatorId fallback:`, creatorId);
         }
+
+        // --- Initialize Channel Info (using denormalized data as initial fallback) ---
+        let creatorName = doc.channelName || 'Unknown Channel'; // Name from video doc
+        let channelAvatarUrl = doc.channelProfileImageUrl || null; // Avatar from video doc
+        let creatorBio = ''; // Initialize bio
+        let creatorAccountNameFallback = null; // To store name from account.get if needed
 
         // If a creatorId was determined, attempt to fetch the user's real name and avatar pref
         if (creatorId) {
+            console.log(`[Detail/${videoId}] Attempting to fetch account details from DB for creatorId: ${creatorId}`);
+            // --- PRIMARY: Fetch account details (name, bio, profileImageUrl) from 'accounts' collection ---
             try {
-                // Attempt to get the user account associated with the creatorId
-                // NOTE: This requires read permission for 'users' or specific user for the client
-                const creatorAccount = await account.get(creatorId);
-                creatorName = creatorAccount.name || creatorName; // Use fetched name if available
-
-                // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
-                try {
-                   const accountDetailsDoc = await databases.getDocument(
-                        appwriteConfig.databaseId,
-                        appwriteConfig.accountsCollectionId,
-                        creatorId
-                   );
-                   if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
-                       channelAvatarUrl = accountDetailsDoc.profileImageUrl;
-                   }
-                   creatorBio = accountDetailsDoc.bio || ''; // Get bio
-                } catch (detailsError) {
-                   if (detailsError.code !== 404) console.warn(`[Detail/${videoId}] Could not fetch account details for creator ${creatorId}:`, detailsError);
-                }
-
-            } catch (userFetchError) {
-                console.warn(`[Detail/${videoId}] Could not fetch user account for creator ${creatorId}:`, userFetchError);
-                // Fallback to denormalized data (already set as defaults)
+               const accountDetailsDoc = await databases.getDocument(
+                 appwriteConfig.databaseId,
+                 appwriteConfig.accountsCollectionId,
+                 creatorId
+               );
+               console.log(`[Detail/${videoId}] Fetched account details document:`, accountDetailsDoc);
+               creatorName = accountDetailsDoc.name || creatorName; // Prioritize name from DB doc
+               creatorBio = accountDetailsDoc.bio || ''; // Get bio from DB doc
+               // Use DB profile image URL if available and no video-specific denormalized one exists
+               if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                 channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                 console.log(`[Detail/${videoId}] Using profile image URL from accounts collection: ${channelAvatarUrl}`);
+               }
+               console.log(`[Detail/${videoId}] Channel name set from DB doc: '${creatorName}'`);
+            } catch (detailsError) {
+               if (detailsError.code === 404) {
+                 console.warn(`[Detail/${videoId}] No account details document found for creator ${creatorId}. Falling back.`);
+                 // FALLBACK: Try fetching the core Appwrite account name if DB doc fails
+                 try {
+                   const creatorAccount = await account.get(creatorId);
+                   creatorAccountNameFallback = creatorAccount.name;
+                   creatorName = creatorAccountNameFallback || creatorName; // Use core account name as fallback
+                   console.log(`[Detail/${videoId}] Channel name set from account.get fallback: '${creatorName}'`);
+                 } catch (accountGetError) {
+                   console.warn(`[Detail/${videoId}] Could not fetch core account details for creator ${creatorId}:`, accountGetError);
+                 }
+               } else {
+                 console.warn(`[Detail/${videoId}] Error fetching account details document for creator ${creatorId}:`, detailsError);
+               }
             }
         } else {
             // Could not determine Creator ID
@@ -169,7 +185,6 @@ const VideoDetail = () => {
           id: doc.$id,
           title: doc.title || 'Untitled Video',
           description: doc.description || 'No description available.', // Keep original video description
-          bio: creatorBio || '', // Add fetched creator bio
           videoStreamUrl: videoStreamUrl, // The actual video stream URL
           thumbnailUrl: thumbnailUrl,     // The thumbnail URL (for poster/related)
           viewCount: doc.viewCount || 0,
@@ -177,11 +192,11 @@ const VideoDetail = () => {
           uploadedAt: doc.$createdAt,    // Use Appwrite's creation timestamp
           channel: {
             // Adjust attribute names based on your Appwrite collection schema
-            id: doc.channelId || (creatorId ? `user-${creatorId}` : `channel-${doc.$id}`), // Prioritize creatorId for fallback ID
-            name: creatorName, // Use extracted name
+            id: creatorId || `channel-${doc.$id}`, // Use creatorId if available, else fallback
+            name: creatorName, // Use name fetched via DB or fallback
             subscriberCount: doc.subscriberCount || 0, // Use denormalized count
             profileImageUrl: channelAvatarUrl, // Use determined avatar URL
-            bio: creatorBio, // Add bio here too if needed directly in channel object
+            bio: creatorBio, // Use bio fetched via DB or fallback ''
             creatorUserId: creatorId // Explicitly store the creator's User ID
           },
           // Add other fields from 'doc' as needed

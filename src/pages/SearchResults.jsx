@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { databases, appwriteConfig, storage, avatars, account } from '../lib/appwriteConfig';
-import { Query } from 'appwrite';
+import { Query } from 'appwrite'; // Import Query directly from appwrite package
 import VideoCard from '../components/VideoCard'; // Assumes VideoCard is in components folder
 import '../App.css'; // Using general App styles, adjust if needed
 

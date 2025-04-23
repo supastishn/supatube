@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { storage } from '../lib/appwriteConfig';
-import { databases, Query, appwriteConfig } from '../lib/appwriteConfig'; // Assuming Query is exported from here or directly from 'appwrite'
+import { storage, databases, appwriteConfig } from '../lib/appwriteConfig';
+import { Query } from 'appwrite'; // Import Query directly from appwrite package
 import VideoCard from '../components/VideoCard'; // Import VideoCard
 import { useAuth } from '../context/AuthContext'; // Optional: To check if it's the current user's profile
 

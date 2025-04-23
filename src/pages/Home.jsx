@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component is in ../components
 import { databases, storage, avatars, account } from '../lib/appwriteConfig';
-import { Query } from 'appwrite';
+import { Query } from 'appwrite'; // Import Query directly from appwrite package
 import { appwriteConfig } from '../lib/appwriteConfig';
 
 const Home = () => {

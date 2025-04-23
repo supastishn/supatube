@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'; // Optional: To check if it's 
 const Profile = () => {
   const { userId } = useParams(); // Get userId from URL
   const navigate = useNavigate(); // Add navigate for redirection
-  const { user: currentUser } = useAuth(); // Get currently logged-in user (optional)
+  const { user: currentUser, loading: authLoading } = useAuth(); // Get currently logged-in user and auth loading state
 
   const [userData, setUserData] = useState(null);
   const [userVideos, setUserVideos] = useState([]);
@@ -18,6 +18,11 @@ const Profile = () => {
   const isOwnProfile = currentUser && currentUser.$id === userId; // Check if it's the logged-in user's profile
 
   useEffect(() => {
+    // Don't fetch profile data until auth state is determined
+    if (authLoading) {
+      return;
+    }
+    
     const fetchProfileData = async () => {
       if (!userId) {
         setError("No user ID provided.");
@@ -77,9 +82,9 @@ const Profile = () => {
     };
 
     fetchProfileData();
-  }, [userId]); // Re-run effect if userId changes
+  }, [userId, authLoading]); // Re-run effect if userId or authLoading changes
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="loading-container">Loading profile...</div>; // Use shared loading style
   }
 

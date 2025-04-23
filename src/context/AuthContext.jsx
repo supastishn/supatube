@@ -46,9 +46,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       // Only log error if it's not the expected "not logged in" error (401)
       if (error.code !== 401) {
-         // Not logged in error
-      } else {
-         // User is not logged in
+        console.error("Error checking user status:", error);
       }
       setUser(null);
     } finally {

@@ -13,7 +13,6 @@ const Auth = ({ type }) => {
     password: '', 
     confirmPassword: '',
     name: '',
-    username: '', // Add username state
     profileImageUrl: '' // Add profile image URL state
   });
   const [error, setError] = useState('');
@@ -28,7 +27,7 @@ const Auth = ({ type }) => {
     setError(''); // Clear previous errors
     setLoading(true);
 
-    const { email, password, confirmPassword, name, profileImageUrl, username } = formData; // Destructure username
+    const { email, password, confirmPassword, name, profileImageUrl } = formData;
 
     // Basic validation
     if (!email || !password) {
@@ -44,19 +43,13 @@ const Auth = ({ type }) => {
     }
 
     try {
-      if (!isSignin && !username.trim()) { // Add username validation for sign-up
-        setError('Username is required.');
-        setLoading(false);
-        return;
-      }
-
       if (isSignin) {
         await login(email, password);
         // Redirect to previous page or home
         const from = location.state?.from?.pathname || "/";
         navigate(from, { replace: true });
       } else {
-        await register(email, password, name, profileImageUrl, username); // Pass username too
+        await register(email, password, name, profileImageUrl);
         // Redirect to home after successful registration and auto-login
         navigate('/');
       }
@@ -97,22 +90,6 @@ const Auth = ({ type }) => {
             />
           </div>
           )}
-          {!isSignin && ( // Add Username field for Sign Up
-          <div className="form-group">
-            <label className="form-label" htmlFor="username">Username</label>
-            <input
-              className="form-input"
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              aria-label="Username"
-              placeholder="Choose a unique username"
-            />
-          </div>
-        )}
         {/* Add Profile Image URL input only for Sign Up */}
         {!isSignin && (
           <div className="form-group">

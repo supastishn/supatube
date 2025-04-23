@@ -23,15 +23,15 @@ export const AuthProvider = ({ children }) => {
         appwriteConfig.accountsCollectionId,
         userId
       );
-      return { bio: doc.bio, profileImageUrl: doc.profileImageUrl, username: doc.username };
+      return { bio: doc.bio, profileImageUrl: doc.profileImageUrl };
     } catch (error) {
       // Handle 404 Not Found specifically - means no profile doc exists yet
       if (error.code === 404) {
-        return { bio: '', profileImageUrl: null, username: null }; // Return default/empty values
+        return { bio: '', profileImageUrl: null }; // Return default/empty values
       }
       console.error("Failed to fetch account details:", error);
       // Return defaults for other errors
-      return { bio: '', profileImageUrl: null, username: null };
+      return { bio: '', profileImageUrl: null };
     }
   };
 
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Register new user
-  const register = async (email, password, name, profileImageUrl, username) => { // Add username parameter
+  const register = async (email, password, name, profileImageUrl) => { // Remove username parameter
     try {
       // 1. Create the user account
       const newAccount = await account.create(
@@ -78,7 +78,6 @@ export const AuthProvider = ({ children }) => {
             {
               bio: '', // Initialize bio as empty
               profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
-              username: username.trim(), // Store the provided username
               name: name // Store the provided name
             },
             [

@@ -5,7 +5,7 @@ import { appwriteConfig } from '../lib/appwriteConfig';
 import { Permission, Role } from 'appwrite'; // Add Permission and Role
 
 const Account = () => {
-  const { user, account, updateUserProfile } = useAuth(); // Get user, account obj, and update function
+  const { user, account, updateUserProfile, logout } = useAuth(); // Get user, account obj, update function, and logout
   const [name, setName] = useState('');
   const [bio, setBio] = useState(''); // Renamed from description to bio
   const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
@@ -169,6 +169,10 @@ const Account = () => {
         </button>
       </form>
 
+      <button onClick={logout} className="btn-secondary logout-button">
+        Sign Out
+      </button>
+
       {/* Simple styling - can be moved to CSS file */}
       <style jsx>{`
         .account-container {
@@ -227,6 +231,21 @@ const Account = () => {
         .form-success {
           color: green;
           margin-bottom: 10px;
+        }
+        .logout-button {
+          margin-top: 30px; /* Space above the logout button */
+          padding: 10px 15px;
+          background-color: var(--light-gray); /* Use a secondary style */
+          color: var(--text-secondary);
+          border: 1px solid var(--gray);
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 1rem;
+          align-self: flex-start;
+        }
+        .logout-button:hover {
+          background-color: #e0e0e0;
+          color: var(--text);
         }
       `}</style>
     </div>

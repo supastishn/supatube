@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { databases } from '../lib/appwriteConfig';
 import { appwriteConfig } from '../lib/appwriteConfig';
+import { Permission, Role } from 'appwrite'; // Add Permission and Role
 
 const Account = () => {
   const { user, account, updateUserProfile } = useAuth(); // Get user, account obj, and update function
@@ -43,13 +44,39 @@ const Account = () => {
       const imageUrlChanged = profileImageUrl !== (user?.profileImageUrl || '');
 
       if (bioChanged || imageUrlChanged) {
-        await databases.updateDocument(
-          appwriteConfig.databaseId,
-          appwriteConfig.accountsCollectionId,
-          user.$id,
-          { bio: bio, profileImageUrl: profileImageUrl }
-        );
-        detailsUpdated = true;
+        try {
+          await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.accountsCollectionId,
+            user.$id,
+            { bio: bio, profileImageUrl: profileImageUrl }
+          );
+          detailsUpdated = true;
+        } catch (docError) {
+          // If the document wasn't found (404), create it instead
+          if (docError.code === 404) {
+            try {
+              await databases.createDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.accountsCollectionId,
+                user.$id, // Use user's ID as document ID
+                { bio: bio, profileImageUrl: profileImageUrl }, // Data to save
+                [
+                  Permission.read(Role.user(user.$id)),   // User can read their own doc
+                  Permission.update(Role.user(user.$id)), // User can update their own doc
+                  Permission.read(Role.any())             // Profiles are public
+                ]
+              );
+              detailsUpdated = true; // Mark as updated since we created it
+            } catch (createError) {
+               // If creation also fails, throw the creation error
+               throw createError;
+            }
+          } else {
+            // If it was an error other than 404, re-throw it
+            throw docError;
+          }
+        }
       }
 
       // Refresh the user state in the context to reflect changes

@@ -83,7 +83,8 @@ const Home = () => {
                     thumbnailUrl = storage.getFilePreview(
                         appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
                         doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
-                    ).href; // Get the URL string
+                    ); // Get the URL string
+                    //print(doc.thumbnail_id)
                 } catch (previewError) {
                     console.error(`[Thumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
                 }

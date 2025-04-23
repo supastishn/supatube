@@ -109,11 +109,7 @@ function App() {
                 <Upload />
               </ProtectedRoute>
             } />
-            <Route path="/profile/:userId" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
+            <Route path="/profile/:userId" element={<Profile />} />
 
             {/* Add Account Page Route */}
             <Route path="/account" element={

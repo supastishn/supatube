@@ -115,7 +115,7 @@ const Profile = () => {
               {userVideos.map((video) => {
                 // --- DEBUG PRINTS ---
                 const thumbnailUrl = video.thumbnail_id ? 
-                  storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id).href : 
+                  storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id) : 
                   'https://via.placeholder.com/320x180?text=No+Thumbnail';
                 const channelName = userData.name || 'Unknown User';
                 console.log(`[Profile/${video.$id}] Thumbnail URL: ${thumbnailUrl}`);
@@ -127,7 +127,7 @@ const Profile = () => {
                     id: video.$id,
                     title: video.title || 'Untitled Video', 
                     thumbnailUrl: video.thumbnail_id ? 
-                      storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id).href : 
+                      storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id) : 
                       'https://via.placeholder.com/320x180?text=No+Thumbnail',
                     durationSeconds: video.video_duration || 0,
                     viewCount: video.viewCount || 0,

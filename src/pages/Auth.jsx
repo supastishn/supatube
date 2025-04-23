@@ -186,7 +186,7 @@ const Auth = ({ type }) => {
         )}
       </div>
       {/* Inline styles specific to Auth page */}
-      <style jsx>{`
+      <style>{`
         .auth-container {
           max-width: 480px;
           margin: 100px auto;

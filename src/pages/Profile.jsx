@@ -18,11 +18,7 @@ const Profile = () => {
   const isOwnProfile = currentUser && currentUser.$id === userId; // Check if it's the logged-in user's profile
 
   useEffect(() => {
-    // Don't fetch profile data until auth state is determined
-    if (authLoading) {
-      return;
-    }
-    
+    // Always fetch profile data, regardless of auth state
     const fetchProfileData = async () => {
       if (!userId) {
         setError("No user ID provided.");
@@ -84,7 +80,7 @@ const Profile = () => {
     fetchProfileData();
   }, [userId, authLoading]); // Re-run effect if userId or authLoading changes
 
-  if (authLoading || loading) {
+  if (loading) {
     return <div className="loading-container">Loading profile...</div>; // Use shared loading style
   }
 

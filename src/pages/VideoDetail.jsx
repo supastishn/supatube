@@ -279,8 +279,6 @@ const VideoDetail = () => {
           videoStreamUrl: videoStreamUrl, // The actual video stream URL
           thumbnailUrl: thumbnailUrl,     // The thumbnail URL (for poster/related)
           viewCount: doc.viewCount || 0,
-          likeCount: doc.likeCount || 0, // Use likeCount from document
-          dislikeCount: doc.dislikeCount || 0, // Use dislikeCount from document
           uploadedAt: doc.$createdAt,    // Use Appwrite's creation timestamp
           channel: {
             // Adjust attribute names based on your Appwrite collection schema

@@ -285,7 +285,8 @@ def main(context):
         success_payload = { "success": True, "newStatus": new_status }
         context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
         context.log("--- Likes Manager Invocation End (Success) ---")
-        return context.res.json(success_payload)
+        context.res.json(success_payload) # Set response details (implicitly uses 200 OK)
+        return json.dumps(success_payload) # Explicitly return JSON string
 
     except Exception as e:
         error_message = f"Unexpected error processing like/dislike: {e}"

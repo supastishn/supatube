@@ -8,15 +8,15 @@ import os
 import json
 
 DATABASE_ID = os.environ.get("APPWRITE_DATABASE_ID", "database")
-VIDEOS_COLLECTION_ID = os.environ.get("APPWRITE_VIDEOS_COLLECTION_ID", "videos")
 LIKES_COLLECTION_ID = os.environ.get("APPWRITE_LIKES_COLLECTION_ID", "likes")
+VIDEO_COUNTS_COLLECTION_ID = os.environ.get("APPWRITE_VIDEO_COUNTS_COLLECTION_ID", "video_counts")
 
 # This is executed when the function is triggered
 def main(context):
     # Ensure environment variables are set
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    api_key = context.req.headers.get('x-appwrite-key')
+    api_key = os.environ.get("APPWRITE_API_KEY") # Use API key environment variable
 
     if not all([api_endpoint, project_id, api_key]):
         context.error("Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY).")
@@ -157,41 +157,64 @@ def main(context):
                 document_id=existing_like_doc['$id']
             )
 
-        # 4. Update counts on the 'videos' collection if there were changes
+        # 4. Update counts on the 'video_counts' collection if there were changes
         if like_change != 0 or dislike_change != 0:
+            current_likes = 0
+            current_dislikes = 0
+            counts_doc_exists = False
+
             try:
-                 # Fetch the current video doc to get current counts (necessary if not using atomic increment)
-                 # NOTE: Appwrite Python SDK might not have atomic increment directly in update_document payload yet.
-                 # This read-modify-write approach has a small chance of race conditions under heavy load.
-                 # If atomic operations become available, use them.
-
-                 video_doc = databases.get_document(DATABASE_ID, VIDEOS_COLLECTION_ID, video_id)
-                 
-                 # Get values, might be None
-                 current_likes = video_doc.get('likeCount') 
-                 current_dislikes = video_doc.get('dislikeCount')
-                 
-                 # Default to 0 if None or missing
-                 current_likes = current_likes if current_likes is not None else 0
-                 current_dislikes = current_dislikes if current_dislikes is not None else 0
-
-                 new_like_count = max(0, current_likes + like_change)
-                 new_dislike_count = max(0, current_dislikes + dislike_change)
-
-                 databases.update_document(
-                    database_id=DATABASE_ID,
-                    collection_id=VIDEOS_COLLECTION_ID,
-                    document_id=video_id,
-                    data={
-                        'likeCount': new_like_count,
-                        'dislikeCount': new_dislike_count
-                    }
-                 )
+                # Try to get the existing counts document using videoId as documentId
+                counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
+                current_likes = counts_doc.get('likeCount', 0)
+                current_dislikes = counts_doc.get('dislikeCount', 0)
+                counts_doc_exists = True
             except AppwriteException as e:
-                 # Log error but continue - like/dislike itself succeeded
-                 context.error(f"Failed to update video counts for {video_id}: {e}")
-                 # Don't fail the whole operation just because counts didn't update
-                 # Optionally, you could try to revert the like/dislike change here for consistency
+                if e.code == 404:
+                    # Document doesn't exist, counts are 0, we need to create it
+                    counts_doc_exists = False
+                    context.log(f"Counts document for video {video_id} not found. Will create.")
+                else:
+                    # Other error fetching counts doc, log it but proceed carefully
+                    context.error(f"Error fetching counts document for {video_id}: {e}")
+                    # Decide if we should stop count update or proceed assuming 0
+                    # For robustness, let's try to proceed assuming counts were 0.
+
+            # Calculate new counts
+            new_like_count = max(0, current_likes + like_change)
+            new_dislike_count = max(0, current_dislikes + dislike_change)
+
+            # Update or Create the counts document
+            try:
+                if counts_doc_exists:
+                    # Update existing document
+                    databases.update_document(
+                        database_id=DATABASE_ID,
+                        collection_id=VIDEO_COUNTS_COLLECTION_ID,
+                        document_id=video_id, # Use videoId as document ID
+                        data={
+                            'likeCount': new_like_count,
+                            'dislikeCount': new_dislike_count
+                        }
+                    )
+                    context.log(f"Updated counts for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
+                else:
+                    # Create new document
+                    databases.create_document(
+                        database_id=DATABASE_ID,
+                        collection_id=VIDEO_COUNTS_COLLECTION_ID,
+                        document_id=video_id, # Use videoId as document ID
+                        data={
+                            'likeCount': new_like_count,
+                            'dislikeCount': new_dislike_count
+                        },
+                        # Grant read access to anyone
+                        permissions=[Permission.read(Role.any())]
+                    )
+                    context.log(f"Created counts document for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
+            except AppwriteException as e:
+                # Log error but continue - like/dislike itself succeeded
+                context.error(f"Failed to update/create counts document for {video_id}: {e}")
 
         # 5. Return success response
         context.log(f"Action '{action}' completed for user '{user_id}' on video '{video_id}'. New status: {new_status}")

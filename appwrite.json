@@ -129,8 +129,7 @@
             "$permissions": [
                 "read(\"guests\")",
                 "create(\"users\")",
-                "read(\"users\")",
-                "update(\"any\")"
+                "read(\"users\")"
             ],
             "databaseId": "database",
             "name": "Videos",
@@ -178,24 +177,6 @@
                     "max": 86400,
                     "default": null
                 },
-                {
-                    "key": "likeCount",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": 0,
-                    "max": 999999999,
-                    "default": 0
-                },
-                {
-                    "key": "dislikeCount",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": 0,
-                    "max": 999999999,
-                    "default": 0
-                }
             ],
             "indexes": [
                 {
@@ -349,12 +330,35 @@
         },
         {
             "$id": "video_counts",
-            "$permissions": [],
+            "$permissions": [
+                "read(\"any\")",
+                "create(\"functions\")",
+                "update(\"functions\")"
+            ],
             "databaseId": "database",
             "name": "Video Counts",
             "enabled": true,
             "documentSecurity": false,
-            "attributes": [],
+            "attributes": [
+                {
+                    "key": "likeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                },
+                {
+                    "key": "dislikeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                }
+            ],
             "indexes": []
         }
     ],

@@ -51,6 +51,7 @@ const VideoDetail = () => {
   const [userLikeStatus, setUserLikeStatus] = useState(null); // 'liked', 'disliked', or null
   const [isLiking, setIsLiking] = useState(false); // Loading state for like/dislike actions
   const [likeError, setLikeError] = useState(''); // Specific error for like/dislike actions
+  const [loadingCounts, setLoadingCounts] = useState(true); // Separate loading for counts
   
   // Handle like/dislike button clicks
   // Handle like/dislike button clicks
@@ -124,6 +125,7 @@ const VideoDetail = () => {
     const fetchVideoData = async () => {
       // Reset all states related to the video
       setLoading(true);
+      setLoadingCounts(true); // Also start counts loading
       setError(null);
       setLikeError('');
       setVideo(null); // Reset video state
@@ -162,9 +164,7 @@ const VideoDetail = () => {
           // Optionally stop loading
         }
 
-        // --- Initialize like/dislike counts from the document ---
-        setLikeCount(doc.likeCount || 0);
-        setDislikeCount(doc.dislikeCount || 0);
+        // Note: like/dislike counts are now fetched separately
 
         // --- Generate Thumbnail URL using thumbnail_id ---
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
@@ -312,14 +312,49 @@ const VideoDetail = () => {
           setError(err.message || "Could not load video details.");
         }
       } finally {
-        setLoading(false);
+        setLoading(false); // Stop overall loading (counts might still be loading)
       }
     };
 
     fetchVideoData();
   }, [videoId]); // Re-run effect when videoId changes
 
-  // --- Add new useEffect to fetch user's like status ---
+  // --- New effect to fetch like/dislike counts ---
+  useEffect(() => {
+    if (!videoId) return; // Don't run if videoId isn't set
+
+    const fetchCounts = async () => {
+      setLoadingCounts(true); // Start count-specific loading
+      try {
+        // Use videoId as the document ID for video_counts
+        const countsDoc = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.videoCountsCollectionId,
+          videoId
+        );
+        setLikeCount(countsDoc.likeCount || 0);
+        setDislikeCount(countsDoc.dislikeCount || 0);
+      } catch (err) {
+        if (err.code === 404) {
+          // Video has no counts document yet (no likes/dislikes)
+          setLikeCount(0);
+          setDislikeCount(0);
+          console.log(`Counts document not found for video ${videoId}, defaulting to 0.`);
+        } else {
+          console.error("Failed to fetch video counts:", err);
+          // Optionally set an error state specific to counts
+          setLikeCount(0); // Default to 0 on error too
+          setDislikeCount(0);
+        }
+      } finally {
+        setLoadingCounts(false); // Stop count-specific loading
+      }
+    };
+
+    fetchCounts();
+  }, [videoId]); // Re-run when videoId changes
+
+  // --- Effect to fetch user's like status ---
   useEffect(() => {
     // Fetch like status only if video data is loaded and user is logged in
     if (videoId && currentUser?.$id) {
@@ -440,7 +475,7 @@ const VideoDetail = () => {
                     console.error('handleLikeDislike is not a function!', handleLikeDislike);
                   }
                 }}
-                disabled={isLiking}
+                disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
                 aria-pressed={userLikeStatus === 'like'}
                 title={userLikeStatus === 'like' ? 'Unlike' : 'I like this'}
               >
@@ -448,7 +483,7 @@ const VideoDetail = () => {
                   <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>
                 </svg>
                 {/* Display updated likeCount state */}
-                <span>{formatViews(likeCount)}</span>
+                <span>{loadingCounts ? '...' : formatViews(likeCount)}</span>
               </button>
 
               {/* Dislike Button */}
@@ -462,7 +497,7 @@ const VideoDetail = () => {
                     console.error('handleLikeDislike is not a function!', handleLikeDislike);
                   }
                 }}
-                disabled={isLiking}
+                disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
                 aria-pressed={userLikeStatus === 'dislike'}
                 title={userLikeStatus === 'dislike' ? 'Remove dislike' : 'I dislike this'}
               >

@@ -8,6 +8,7 @@ export const appwriteConfig = {
     storageVideosBucketId: 'videos',         // Videos storage bucket ID
     accountsCollectionId: 'accounts',        // Accounts collection ID
     likesCollectionId: 'likes',              // Likes collection ID
+    videoCountsCollectionId: 'video_counts', // Video counts collection ID
 };
 
 // Initialize Appwrite client

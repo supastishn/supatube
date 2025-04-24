@@ -115,7 +115,7 @@ const VideoDetail = () => {
     } finally {
       setIsLiking(false); // Re-enable buttons
     }
-  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate]);
+  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, setUserLikeStatus, setLikeCount, setDislikeCount, setLikeError, setIsLiking]);
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -429,7 +429,14 @@ const VideoDetail = () => {
               {/* Like Button */}
               <button
                 className={`video-action-btn like-btn ${userLikeStatus === 'like' ? 'active' : ''}`}
-                onClick={() => handleLikeDislike('like')}
+                onClick={() => {
+                  console.log('Like button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
+                  if (typeof handleLikeDislike === 'function') {
+                    handleLikeDislike('like');
+                  } else {
+                    console.error('handleLikeDislike is not a function!', handleLikeDislike);
+                  }
+                }}
                 disabled={isLiking}
                 aria-pressed={userLikeStatus === 'like'}
                 title={userLikeStatus === 'like' ? 'Unlike' : 'I like this'}
@@ -444,7 +451,14 @@ const VideoDetail = () => {
               {/* Dislike Button */}
               <button
                 className={`video-action-btn dislike-btn ${userLikeStatus === 'dislike' ? 'active' : ''}`}
-                onClick={() => handleLikeDislike('dislike')}
+                onClick={() => {
+                  console.log('Dislike button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
+                  if (typeof handleLikeDislike === 'function') {
+                    handleLikeDislike('dislike');
+                  } else {
+                    console.error('handleLikeDislike is not a function!', handleLikeDislike);
+                  }
+                }}
                 disabled={isLiking}
                 aria-pressed={userLikeStatus === 'dislike'}
                 title={userLikeStatus === 'dislike' ? 'Remove dislike' : 'I dislike this'}

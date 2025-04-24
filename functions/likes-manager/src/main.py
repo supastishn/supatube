@@ -39,7 +39,8 @@ def main(context):
         response_status = 500
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status)
+        context.res.json(response_payload, statusCode=response_status) # Set response details
+        return json.dumps(response_payload) # Explicitly return JSON string
 
     # Check for User ID (should be present if execute permission is 'users')
     user_id = context.req.headers.get('x-appwrite-user-id')
@@ -50,7 +51,8 @@ def main(context):
         response_status = 401
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status)
+        context.res.json(response_payload, statusCode=response_status) # Set response details
+        return json.dumps(response_payload) # Explicitly return JSON string
     context.log(f"Authenticated User ID: {user_id}")
 
     # Parse request body
@@ -78,7 +80,8 @@ def main(context):
         response_status = 400
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status)
+        context.res.json(response_payload, statusCode=response_status) # Set response details
+        return json.dumps(response_payload) # Explicitly return JSON string
 
     # Initialize Appwrite Client
     client = Client()
@@ -292,4 +295,5 @@ def main(context):
         # --- Log Response Before Returning ---
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status)
+        context.res.json(response_payload, statusCode=response_status) # Set response details
+        return json.dumps(response_payload) # Explicitly return JSON string

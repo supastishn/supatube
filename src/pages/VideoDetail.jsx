@@ -48,7 +48,7 @@ const VideoDetail = () => {
   // --- Add new state variables ---
   const [likeCount, setLikeCount] = useState(0);
   const [dislikeCount, setDislikeCount] = useState(0); // Track it even if not displayed
-  const [userLikeStatus, setUserLikeStatus] = useState(null); // 'liked', 'disliked', or null
+  const [userLikeStatus, setUserLikeStatus] = useState(0); // 1 for liked, -1 for disliked, 0 for null
   const [isLiking, setIsLiking] = useState(false); // Loading state for like/dislike actions
   const [likeError, setLikeError] = useState(''); // Specific error for like/dislike actions
   const [loadingCounts, setLoadingCounts] = useState(true); // Separate loading for counts
@@ -73,23 +73,23 @@ const VideoDetail = () => {
     const previousDislikeCount = dislikeCount;
 
     // --- Perform Optimistic Update ---
-    let optimisticStatus = null;
+    let optimisticStatus = 0; // Default to 0 (no interaction)
     let optimisticLikeChange = 0;
     let optimisticDislikeChange = 0;
 
     if (action === 'like') {
-      if (previousStatus === 'liked') { // Toggling like off
-        optimisticStatus = null; optimisticLikeChange = -1;
-      } else { // Liking (or changing from dislike)
-        optimisticStatus = 'liked'; optimisticLikeChange = 1;
-        if (previousStatus === 'disliked') { optimisticDislikeChange = -1; }
+      if (previousStatus === 1) { // Toggling like off (was 1, becomes 0)
+        optimisticStatus = 0; optimisticLikeChange = -1;
+      } else { // Liking (or changing from dislike) (becomes 1)
+        optimisticStatus = 1; optimisticLikeChange = 1;
+        if (previousStatus === -1) { optimisticDislikeChange = -1; } // Was disliked (-1)
       }
     } else { // action === 'dislike'
-      if (previousStatus === 'disliked') { // Toggling dislike off
-        optimisticStatus = null; optimisticDislikeChange = -1;
-      } else { // Disliking (or changing from like)
-        optimisticStatus = 'disliked'; optimisticDislikeChange = 1;
-        if (previousStatus === 'liked') { optimisticLikeChange = -1; }
+      if (previousStatus === -1) { // Toggling dislike off (was -1, becomes 0)
+        optimisticStatus = 0; optimisticDislikeChange = -1;
+      } else { // Disliking (or changing from like) (becomes -1)
+        optimisticStatus = -1; optimisticDislikeChange = 1;
+        if (previousStatus === 1) { optimisticLikeChange = -1; } // Was liked (1)
       }
     }
 
@@ -369,9 +369,10 @@ const VideoDetail = () => {
           );
 
           if (response.documents.length > 0) {
-            setUserLikeStatus(response.documents[0].type); // 'like' or 'dislike'
+            const statusType = response.documents[0].type;
+            setUserLikeStatus(statusType === 'like' ? 1 : (statusType === 'dislike' ? -1 : 0)); // Map string to integer
           } else {
-            setUserLikeStatus(null); // No record found
+            setUserLikeStatus(0); // No record found means status is 0 (null)
           }
         } catch (err) {
           // Handle common errors like collection not found during setup
@@ -381,14 +382,14 @@ const VideoDetail = () => {
              console.error("Failed to fetch user's like status:", err);
           }
           // Don't set page error, just log it. Lack of status isn't page-breaking.
-          setUserLikeStatus(null);
+          setUserLikeStatus(0);
         }
       };
 
       fetchUserLikeStatus();
     } else {
       // If user logs out or videoId changes, reset status
-      setUserLikeStatus(null);
+      setUserLikeStatus(0);
     }
   }, [videoId, currentUser]); // Re-run when video or user changes
 
@@ -464,7 +465,7 @@ const VideoDetail = () => {
             <div className="video-actions">
               {/* Like Button */}
               <button
-                className={`video-action-btn like-btn ${userLikeStatus === 'like' ? 'active' : ''}`}
+                className={`video-action-btn like-btn ${userLikeStatus === 1 ? 'active' : ''}`}
                 onClick={() => {
                   console.log('Like button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
                   if (typeof handleLikeDislike === 'function') {
@@ -474,8 +475,8 @@ const VideoDetail = () => {
                   }
                 }}
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={userLikeStatus === 'like'}
-                title={userLikeStatus === 'like' ? 'Unlike' : 'I like this'}
+                aria-pressed={userLikeStatus === 1}
+                title={userLikeStatus === 1 ? 'Unlike' : 'I like this'}
               >
                 <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                   <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>
@@ -486,7 +487,7 @@ const VideoDetail = () => {
 
               {/* Dislike Button */}
               <button
-                className={`video-action-btn dislike-btn ${userLikeStatus === 'dislike' ? 'active' : ''}`}
+                className={`video-action-btn dislike-btn ${userLikeStatus === -1 ? 'active' : ''}`}
                 onClick={() => {
                   console.log('Dislike button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
                   if (typeof handleLikeDislike === 'function') {
@@ -496,8 +497,8 @@ const VideoDetail = () => {
                   }
                 }}
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={userLikeStatus === 'dislike'}
-                title={userLikeStatus === 'dislike' ? 'Remove dislike' : 'I dislike this'}
+                aria-pressed={userLikeStatus === -1}
+                title={userLikeStatus === -1 ? 'Remove dislike' : 'I dislike this'}
               >
                  <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                    <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v1.91l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"></path>

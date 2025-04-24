@@ -278,8 +278,15 @@ def main(context):
 
         # === End Core Logic ===
 
-        # 5. Return success response
-        success_payload = { "success": True, "newStatus": new_status }
+        # 5. Map status to integer and return success response
+        if new_status == 'liked':
+            integer_status = 1
+        elif new_status == 'disliked':
+            integer_status = -1
+        else: # new_status is None
+            integer_status = 0
+
+        success_payload = { "success": True, "newStatus": integer_status } # Use integer status
         context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
         context.log("--- Likes Manager Invocation End (Success) ---")
         return context.res.json(success_payload) # Return the configured response

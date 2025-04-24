@@ -136,6 +136,46 @@ const VideoCard = ({ video, isRelated = false }) => {
           align-items: flex-start; /* Align items to top */
         }
 
+        /* --- Styles for Like/Dislike Buttons --- */
+
+        .video-actions .video-action-btn.like-btn,
+        .video-actions .video-action-btn.dislike-btn {
+          /* Base styles covered by .video-action-btn */
+        }
+
+        .video-actions .video-action-btn.like-btn span {
+            margin-left: 4px; /* Space between icon and count */
+        }
+
+        /* Active state for like/dislike buttons */
+        .video-actions .video-action-btn.active {
+          /* Example: Slightly darker background or different visual cue */
+          /* background-color: #d9d9d9; */
+        }
+
+        /* Style the SVG icon when the button is active */
+        .video-actions .video-action-btn.active svg {
+          /* Example: Use primary color or specific colors */
+          fill: var(--primary); /* Red for liked */
+        }
+        .video-actions .video-action-btn.dislike-btn.active svg {
+          fill: #606060; /* Dark gray for disliked (example) */
+        }
+
+        /* Style for disabled state */
+        .video-actions .video-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        /* Style for like/dislike error message */
+        .like-error-message {
+          color: var(--primary, red);
+          font-size: 13px;
+          margin-top: 8px;
+          width: 100%; /* Span full width below actions */
+        }
+
         .thumbnail-container {
           position: relative;
           display: block; /* Ensure it behaves like a block element */

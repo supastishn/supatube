@@ -1,4 +1,4 @@
-import { Client, Account, Databases, Storage, Avatars } from 'appwrite';
+import { Client, Account, Databases, Storage, Avatars, Functions } from 'appwrite';
 
 export const appwriteConfig = {
     endpoint: 'https://fra.cloud.appwrite.io/v1',
@@ -6,7 +6,8 @@ export const appwriteConfig = {
     databaseId: 'database',                  // Database ID
     videosCollectionId: 'videos',            // Videos collection ID
     storageVideosBucketId: 'videos',         // Videos storage bucket ID
-    accountsCollectionId: 'accounts',        // Accounts collection ID (NEW)
+    accountsCollectionId: 'accounts',        // Accounts collection ID
+    likesCollectionId: 'likes',              // Likes collection ID
 };
 
 // Initialize Appwrite client
@@ -20,3 +21,4 @@ export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const avatars = new Avatars(client);
+export const functions = new Functions(client);

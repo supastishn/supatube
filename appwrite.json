@@ -41,14 +41,16 @@
         {
             "$id": "likes-manager",
             "execute": [
-                "any"
+                "users"
             ],
             "name": "likes-manager",
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [
-                "users.read"
+                "users.read",
+                "collections.read",
+                "collections.write"
             ],
             "events": [],
             "schedule": "",
@@ -92,7 +94,8 @@
             "$permissions": [
                 "read(\"guests\")",
                 "create(\"users\")",
-                "read(\"users\")"
+                "read(\"users\")",
+                "update(\"any\")"
             ],
             "databaseId": "database",
             "name": "Videos",
@@ -139,6 +142,24 @@
                     "min": 0,
                     "max": 86400,
                     "default": null
+                },
+                {
+                    "key": "likeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                },
+                {
+                    "key": "dislikeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
                 }
             ],
             "indexes": [
@@ -197,35 +218,56 @@
         {
             "$id": "likes",
             "$permissions": [
-                "create(\"any\")",
-                "read(\"any\")",
-                "update(\"any\")",
-                "delete(\"any\")"
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
             ],
             "databaseId": "database",
-            "name": "Likes/Dislikes",
+            "name": "Likes",
             "enabled": true,
-            "documentSecurity": false,
+            "documentSecurity": true,
             "attributes": [
+                {
+                    "key": "userId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null
+                },
                 {
                     "key": "videoId",
                     "type": "string",
                     "required": true,
                     "array": false,
-                    "size": 200,
+                    "size": 255,
                     "default": null
                 },
                 {
-                    "key": "like",
-                    "type": "integer",
+                    "key": "type",
+                    "type": "string",
                     "required": true,
                     "array": false,
-                    "min": -1,
-                    "max": 1,
+                    "size": 10,
                     "default": null
                 }
             ],
-            "indexes": []
+            "indexes": [
+                {
+                    "key": "userId_videoId",
+                    "type": "key",
+                    "status": "available",
+                    "attributes": [
+                        "userId",
+                        "videoId"
+                    ],
+                    "orders": [
+                        "ASC",
+                        "ASC"
+                    ]
+                }
+            ]
         },
         {
             "$id": "video_interactions",

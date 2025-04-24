@@ -1,12 +1,15 @@
-import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component
 import { formatDistanceToNowStrict, parseISO } from 'date-fns'; // For time ago formatting
 import { Fragment } from 'react'; // Import Fragment if needed for structure
+import { useAuth } from '../context/AuthContext'; // Import useAuth
+import { toggleLikeDislike } from '../lib/likesService'; // Import the new service
 
 // Appwrite Imports
 import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
 import { appwriteConfig } from '../lib/appwriteConfig';
+import { Query } from 'appwrite'; // Import Query
 
 // Helper function to format view counts (e.g., 1.2M, 10K)
 const formatViews = (views) => {
@@ -33,18 +36,34 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
+  const { user: currentUser } = useAuth(); // Get current user
+  const navigate = useNavigate(); // For redirecting to sign-in
+
   const [video, setVideo] = useState(null);
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFullBio, setShowFullBio] = useState(false); // Renamed state
 
+  // --- Add new state variables ---
+  const [likeCount, setLikeCount] = useState(0);
+  const [dislikeCount, setDislikeCount] = useState(0); // Track it even if not displayed
+  const [userLikeStatus, setUserLikeStatus] = useState(null); // 'liked', 'disliked', or null
+  const [isLiking, setIsLiking] = useState(false); // Loading state for like/dislike actions
+  const [likeError, setLikeError] = useState(''); // Specific error for like/dislike actions
+
   useEffect(() => {
     const fetchVideoData = async () => {
+      // Reset all states related to the video
       setLoading(true);
       setError(null);
+      setLikeError('');
       setVideo(null); // Reset video state
       setRelatedVideos([]); // Reset related videos
+      setLikeCount(0);
+      setDislikeCount(0);
+      setUserLikeStatus(null); // Reset user status on new video load
+      setShowFullBio(false);
 
       try {
         // --- Fetch Video Document from Appwrite ---
@@ -74,6 +93,10 @@ const VideoDetail = () => {
           setError("Video file information missing.");
           // Optionally stop loading
         }
+
+        // --- Initialize like/dislike counts from the document ---
+        setLikeCount(doc.likeCount || 0);
+        setDislikeCount(doc.dislikeCount || 0);
 
         // --- Generate Thumbnail URL using thumbnail_id ---
         let thumbnailUrl = 'https://via.placeholder.com/640x360?text=No+Thumb'; // Default fallback
@@ -188,7 +211,8 @@ const VideoDetail = () => {
           videoStreamUrl: videoStreamUrl, // The actual video stream URL
           thumbnailUrl: thumbnailUrl,     // The thumbnail URL (for poster/related)
           viewCount: doc.viewCount || 0,
-          likeCount: doc.likeCount || 0, // Assuming 'likeCount' attribute exists
+          likeCount: doc.likeCount || 0, // Use likeCount from document
+          dislikeCount: doc.dislikeCount || 0, // Use dislikeCount from document
           uploadedAt: doc.$createdAt,    // Use Appwrite's creation timestamp
           channel: {
             // Adjust attribute names based on your Appwrite collection schema
@@ -225,9 +249,47 @@ const VideoDetail = () => {
     };
 
     fetchVideoData();
-    // Reset description visibility when video ID changes
-    setShowFullBio(false); // Reset bio visibility
   }, [videoId]); // Re-run effect when videoId changes
+
+  // --- Add new useEffect to fetch user's like status ---
+  useEffect(() => {
+    // Fetch like status only if video data is loaded and user is logged in
+    if (videoId && currentUser?.$id) {
+      const fetchUserLikeStatus = async () => {
+        try {
+          const response = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.likesCollectionId,
+            [
+              Query.equal('userId', currentUser.$id),
+              Query.equal('videoId', videoId),
+              Query.limit(1) // We only need one record max
+            ]
+          );
+
+          if (response.documents.length > 0) {
+            setUserLikeStatus(response.documents[0].type); // 'like' or 'dislike'
+          } else {
+            setUserLikeStatus(null); // No record found
+          }
+        } catch (err) {
+          // Handle common errors like collection not found during setup
+          if (err.code === 404 && err.message.includes('Collection')) {
+             console.warn("Like status check failed: 'likes' collection not found. Did you deploy it?");
+          } else {
+             console.error("Failed to fetch user's like status:", err);
+          }
+          // Don't set page error, just log it. Lack of status isn't page-breaking.
+          setUserLikeStatus(null);
+        }
+      };
+
+      fetchUserLikeStatus();
+    } else {
+      // If user logs out or videoId changes, reset status
+      setUserLikeStatus(null);
+    }
+  }, [videoId, currentUser]); // Re-run when video or user changes
 
   // --- Render States ---
 
@@ -297,20 +359,36 @@ const VideoDetail = () => {
             <div className="video-views">
               {formatViews(video.viewCount)} views • {formatTimeAgo(video.uploadedAt)}
             </div>
-            {/* Action Buttons */}
+            {/* --- Updated Action Buttons --- */}
             <div className="video-actions">
-              <button className="video-action-btn">
+              {/* Like Button */}
+              <button
+                className={`video-action-btn like-btn ${userLikeStatus === 'like' ? 'active' : ''}`}
+                onClick={() => handleLikeDislike('like')}
+                disabled={isLiking}
+                aria-pressed={userLikeStatus === 'like'}
+                title={userLikeStatus === 'like' ? 'Unlike' : 'I like this'}
+              >
                 <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                   <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>
                 </svg>
-                {formatViews(video.likeCount)}
+                {/* Display updated likeCount state */}
+                <span>{formatViews(likeCount)}</span>
               </button>
-              {/* Dislike Button (Placeholder) */}
-              <button className="video-action-btn">
+
+              {/* Dislike Button */}
+              <button
+                className={`video-action-btn dislike-btn ${userLikeStatus === 'dislike' ? 'active' : ''}`}
+                onClick={() => handleLikeDislike('dislike')}
+                disabled={isLiking}
+                aria-pressed={userLikeStatus === 'dislike'}
+                title={userLikeStatus === 'dislike' ? 'Remove dislike' : 'I dislike this'}
+              >
                  <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                    <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v1.91l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"></path>
                 </svg>
-                {/* Dislike count often hidden */}
+                {/* Optionally display dislike count */}
+                {/* <span>{formatViews(dislikeCount)}</span> */}
               </button>
               {/* Share Button (Placeholder) */}
               <button className="video-action-btn">
@@ -328,6 +406,8 @@ const VideoDetail = () => {
               </button>
             </div>
           </div>
+          {/* Display Like/Dislike Error */}
+          {likeError && <p className="like-error-message">{likeError}</p>}
         </div>
 
         {/* Channel Info and Description Box */}
@@ -384,3 +464,64 @@ const VideoDetail = () => {
 };
 
 export default VideoDetail;
+  // --- Define Event Handler for Likes/Dislikes ---
+  const handleLikeDislike = useCallback(async (action) => {
+    if (!currentUser) {
+      navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
+      return;
+    }
+
+    if (isLiking) return; // Prevent multiple clicks
+    setIsLiking(true);
+    setLikeError(''); // Clear previous like errors
+
+    // --- Optimistic Update ---
+    const previousStatus = userLikeStatus;
+    const previousLikeCount = likeCount;
+    const previousDislikeCount = dislikeCount;
+
+    let optimisticStatus = null;
+    let optimisticLikeChange = 0;
+    let optimisticDislikeChange = 0;
+
+    if (action === 'like') {
+      if (previousStatus === 'like') { // Toggling like off
+        optimisticStatus = null; optimisticLikeChange = -1;
+      } else { // Liking (or changing from dislike)
+        optimisticStatus = 'like'; optimisticLikeChange = 1;
+        if (previousStatus === 'dislike') { optimisticDislikeChange = -1; }
+      }
+    } else { // action === 'dislike'
+      if (previousStatus === 'dislike') { // Toggling dislike off
+        optimisticStatus = null; optimisticDislikeChange = -1;
+      } else { // Disliking (or changing from like)
+        optimisticStatus = 'dislike'; optimisticDislikeChange = 1;
+        if (previousStatus === 'like') { optimisticLikeChange = -1; }
+      }
+    }
+
+    // Apply optimistic updates to UI state
+    setUserLikeStatus(optimisticStatus);
+    setLikeCount(prev => Math.max(0, prev + optimisticLikeChange));
+    setDislikeCount(prev => Math.max(0, prev + optimisticDislikeChange));
+
+    try {
+      // Call the backend function
+      const result = await toggleLikeDislike(videoId, action);
+      // Success! Backend confirmed the state.
+      // The function *might* return updated counts, but relying on optimistic is fine.
+      // We trust the function updated the counts correctly.
+      console.log('Like/Dislike function success:', result);
+
+    } catch (error) {
+      console.error(`Failed to ${action} video:`, error);
+      // Revert UI on failure
+      setUserLikeStatus(previousStatus);
+      setLikeCount(previousLikeCount);
+      setDislikeCount(previousDislikeCount);
+      setLikeError(error.message || `Failed to update ${action} status.`); // Set specific error
+
+    } finally {
+      setIsLiking(false);
+    }
+  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate]); // Include dependencies

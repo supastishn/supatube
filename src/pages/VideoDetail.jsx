@@ -117,6 +117,9 @@ const VideoDetail = () => {
     }
   }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, setUserLikeStatus, setLikeCount, setDislikeCount, setLikeError, setIsLiking]);
 
+  // Debug log to verify the function exists before rendering
+  console.log('Is handleLikeDislike defined before render?', typeof handleLikeDislike);
+
   useEffect(() => {
     const fetchVideoData = async () => {
       // Reset all states related to the video

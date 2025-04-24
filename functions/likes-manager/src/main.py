@@ -7,9 +7,9 @@ from appwrite.role import Role
 import os
 import json
 
-DATABASE_ID = os.environ.get("APPWRITE_DATABASE_ID", "database")
-LIKES_COLLECTION_ID = os.environ.get("APPWRITE_LIKES_COLLECTION_ID", "likes")
-VIDEO_COUNTS_COLLECTION_ID = os.environ.get("APPWRITE_VIDEO_COUNTS_COLLECTION_ID", "video_counts")
+DATABASE_ID = "database"
+LIKES_COLLECTION_ID =  "likes"
+VIDEO_COUNTS_COLLECTION_ID = "video_counts"
 
 # This is executed when the function is triggered
 def main(context):
@@ -30,7 +30,7 @@ def main(context):
     # Ensure environment variables are set
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    api_key = os.environ.get("APPWRITE_API_KEY") # Use API key environment variable
+    api_key = context.req.headers.get('x-appwrite-key') # Use API key environment variable
 
     if not all([api_endpoint, project_id, api_key]):
         error_message = "Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY)."

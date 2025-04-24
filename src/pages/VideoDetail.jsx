@@ -108,7 +108,7 @@ const VideoDetail = () => {
     } finally {
       setIsLiking(false);
     }
-  }, [currentUser, videoId, isLiking, userLikeStatus, navigate, location]);
+  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate]);
 
   useEffect(() => {
     const fetchVideoData = async () => {

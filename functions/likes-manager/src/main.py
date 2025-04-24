@@ -20,13 +20,13 @@ def main(context):
 
     if not all([api_endpoint, project_id, api_key]):
         context.error("Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY).")
-        return context.res.status(500).json({"success": False, "message": "Function configuration error."})
+        return context.res.json({"success": False, "message": "Function configuration error."}, statusCode=500)
 
     # Check for User ID (should be present if execute permission is 'users')
     user_id = context.req.headers.get('x-appwrite-user-id')
     if not user_id:
         context.error("User not authenticated.")
-        return context.res.status(401).json({"success": False, "message": "Authentication required."})
+        return context.res.json({"success": False, "message": "Authentication required."}, statusCode=401)
 
     # Parse request body
     try:
@@ -38,7 +38,7 @@ def main(context):
             raise ValueError("Missing 'videoId' or invalid 'action' in request body.")
     except Exception as e:
         context.error(f"Invalid request payload: {e}")
-        return context.res.status(400).json({"success": False, "message": f"Invalid request: {e}"})
+        return context.res.json({"success": False, "message": f"Invalid request: {e}"}, statusCode=400)
 
     # Initialize Appwrite Client
     client = Client()

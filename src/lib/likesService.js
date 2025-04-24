@@ -44,14 +44,16 @@ export const toggleLikeDislike = async (videoId, action) => {
     try {
         responseData = JSON.parse(result.response);
         console.log(`[likesService] Parsed function response:`, responseData);
+        console.log(`[likesService] Parsed responseData.success: ${responseData.success} (Type: ${typeof responseData.success})`);
+        console.log(`[likesService] Parsed responseData.newStatus: ${responseData.newStatus} (Type: ${typeof responseData.newStatus})`);
     } catch (parseError) {
         console.error("[likesService] Could not parse JSON response from likes function:", result.response, parseError);
         // Treat non-JSON response as an error from the function's perspective
         throw new Error(`Failed to ${action} video. Unexpected response from function.`);
     }
 
-    // Check the 'success' flag within the parsed response data
-    if (!responseData.success) {
+    // Check the 'success' flag (which is now a string 'true' or 'false')
+    if (responseData.success !== 'true') { // Check for the string "true"
       console.error(`[likesService] Function indicated failure:`, responseData.message);
       throw new Error(responseData.message || `Failed to ${action} video.`);
     }

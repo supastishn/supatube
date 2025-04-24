@@ -53,60 +53,67 @@ const VideoDetail = () => {
   const [likeError, setLikeError] = useState(''); // Specific error for like/dislike actions
   
   // Handle like/dislike button clicks
+  // Handle like/dislike button clicks
   const handleLikeDislike = useCallback(async (action) => {
     // If not logged in, redirect to sign in
     if (!currentUser) {
-      navigate('/sign-in', { state: { from: location } });
+      // Pass the intended return path correctly
+      navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
       return;
     }
 
-    // Prevent multiple clicks while processing
-    if (isLiking) return;
-
+    if (isLiking) return; // Prevent multiple clicks
     setIsLiking(true);
-    setLikeError('');
+    setLikeError(''); // Clear previous like errors
 
-    try {
-      // Call the backend function
-      const result = await toggleLikeDislike(videoId, action);
-      
-      // Update UI based on response
-      if (result.success) {
-        // Update like status
-        setUserLikeStatus(result.newStatus);
+    // --- Store previous state for rollback ---
+    const previousStatus = userLikeStatus;
+    const previousLikeCount = likeCount;
+    const previousDislikeCount = dislikeCount;
 
-        // Update counts based on what happened
-        if (action === 'like') {
-          if (userLikeStatus === 'like') {
-            // Unlike: Decrease like count
-            setLikeCount(prev => Math.max(0, prev - 1));
-          } else if (userLikeStatus === 'dislike') {
-            // Change from dislike to like: Decrease dislike count, increase like count
-            setDislikeCount(prev => Math.max(0, prev - 1));
-            setLikeCount(prev => prev + 1);
-          } else {
-            // New like: Increase like count
-            setLikeCount(prev => prev + 1);
-          }
-        } else if (action === 'dislike') {
-          if (userLikeStatus === 'dislike') {
-            // Undislike: Decrease dislike count
-            setDislikeCount(prev => Math.max(0, prev - 1));
-          } else if (userLikeStatus === 'like') {
-            // Change from like to dislike: Decrease like count, increase dislike count
-            setLikeCount(prev => Math.max(0, prev - 1));
-            setDislikeCount(prev => prev + 1);
-          } else {
-            // New dislike: Increase dislike count
-            setDislikeCount(prev => prev + 1);
-          }
-        }
+    // --- Perform Optimistic Update ---
+    let optimisticStatus = null;
+    let optimisticLikeChange = 0;
+    let optimisticDislikeChange = 0;
+
+    if (action === 'like') {
+      if (previousStatus === 'liked') { // Toggling like off
+        optimisticStatus = null; optimisticLikeChange = -1;
+      } else { // Liking (or changing from dislike)
+        optimisticStatus = 'liked'; optimisticLikeChange = 1;
+        if (previousStatus === 'disliked') { optimisticDislikeChange = -1; }
       }
-    } catch (err) {
-      console.error('Like/dislike action failed:', err);
-      setLikeError(err.message || `Failed to ${action} video`);
+    } else { // action === 'dislike'
+      if (previousStatus === 'disliked') { // Toggling dislike off
+        optimisticStatus = null; optimisticDislikeChange = -1;
+      } else { // Disliking (or changing from like)
+        optimisticStatus = 'disliked'; optimisticDislikeChange = 1;
+        if (previousStatus === 'liked') { optimisticLikeChange = -1; }
+      }
+    }
+
+    // Apply optimistic updates to UI state immediately
+    setUserLikeStatus(optimisticStatus);
+    setLikeCount(prev => Math.max(0, prev + optimisticLikeChange));
+    setDislikeCount(prev => Math.max(0, prev + optimisticDislikeChange));
+
+    // --- Call Backend ---
+    try {
+      const result = await toggleLikeDislike(videoId, action);
+      // Success! Backend confirmed. Optimistic update was likely correct.
+      console.log('Like/Dislike function success:', result);
+      // Optionally update status definitively from result if needed
+      // setUserLikeStatus(result.newStatus);
+
+    } catch (error) {
+      console.error(`Failed to ${action} video:`, error);
+      // --- FAILURE: Revert UI state ---
+      setUserLikeStatus(previousStatus);
+      setLikeCount(previousLikeCount);
+      setDislikeCount(previousDislikeCount);
+      setLikeError(error.message || `Failed to update ${action} status.`);
     } finally {
-      setIsLiking(false);
+      setIsLiking(false); // Re-enable buttons
     }
   }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate]);
 

@@ -40,7 +40,6 @@ def main(context):
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
         context.res.json(response_payload, statusCode=response_status) # Set response details
-        return json.dumps(response_payload) # Explicitly return JSON string
 
     # Check for User ID (should be present if execute permission is 'users')
     user_id = context.req.headers.get('x-appwrite-user-id')
@@ -52,7 +51,6 @@ def main(context):
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
         context.res.json(response_payload, statusCode=response_status) # Set response details
-        return json.dumps(response_payload) # Explicitly return JSON string
     context.log(f"Authenticated User ID: {user_id}")
 
     # Parse request body
@@ -81,7 +79,6 @@ def main(context):
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
         context.res.json(response_payload, statusCode=response_status) # Set response details
-        return json.dumps(response_payload) # Explicitly return JSON string
 
     # Initialize Appwrite Client
     client = Client()
@@ -286,7 +283,6 @@ def main(context):
         context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
         context.log("--- Likes Manager Invocation End (Success) ---")
         context.res.json(success_payload) # Set response details (implicitly uses 200 OK)
-        return json.dumps(success_payload) # Explicitly return JSON string
 
     except Exception as e:
         error_message = f"Unexpected error processing like/dislike: {e}"
@@ -297,4 +293,3 @@ def main(context):
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
         context.res.json(response_payload, statusCode=response_status) # Set response details
-        return json.dumps(response_payload) # Explicitly return JSON string

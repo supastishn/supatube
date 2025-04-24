@@ -35,7 +35,7 @@ def main(context):
     if not all([api_endpoint, project_id, api_key]):
         error_message = "Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY)."
         context.error(error_message)
-        response_payload = {"success": False, "message": "Function configuration error."}
+        response_payload = {"success": "false", "message": "Function configuration error."}
         response_status = 500
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
@@ -46,7 +46,7 @@ def main(context):
     if not user_id:
         error_message = "User not authenticated."
         context.error(error_message)
-        response_payload = {"success": False, "message": "Authentication required."}
+        response_payload = {"success": "false", "message": "Authentication required."}
         response_status = 401
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
@@ -74,7 +74,7 @@ def main(context):
         # Log the specific error and include the raw body for context
         error_message = f"Invalid request payload: {e}. Raw body was: '{context.req.body_raw}'"
         context.error(error_message)
-        response_payload = {"success": False, "message": f"Invalid request: {e}"}
+        response_payload = {"success": "false", "message": f"Invalid request: {e}"}
         response_status = 400
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
         context.log("--- Likes Manager Invocation End (Error) ---")
@@ -286,7 +286,7 @@ def main(context):
         else: # new_status is None
             integer_status = 0
 
-        success_payload = { "success": True, "newStatus": integer_status } # Use integer status
+        success_payload = { "success": "true", "newStatus": integer_status } # Use string "true" and integer status
         context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
         context.log("--- Likes Manager Invocation End (Success) ---")
         return context.res.json(success_payload) # Return the configured response
@@ -294,7 +294,7 @@ def main(context):
     except Exception as e:
         error_message = f"Unexpected error processing like/dislike: {e}"
         context.error(error_message, exc_info=True) # Log full traceback
-        response_payload = {"success": False, "message": f"Server error: {e}"}
+        response_payload = {"success": "false", "message": f"Server error: {e}"}
         response_status = 500
         # --- Log Response Before Returning ---
         context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")

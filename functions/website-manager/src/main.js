@@ -16,13 +16,12 @@ const getOwnerId = (permissions) => {
   return null; // Return null if no owner delete permission found
 };
 
-// --- 1. Get Environment Variables & Initialize Client (Top Level) ---
+// --- 1. Get Environment Variables (Top Level) ---
 console.log('[Top Level] Initializing function instance for event processing...');
 
 const {
   APPWRITE_FUNCTION_ENDPOINT,
   APPWRITE_FUNCTION_PROJECT_ID,
-  APPWRITE_FUNCTION_API_KEY, // Use the API key provided by the function runtime
   APPWRITE_DATABASE_ID,
   LIKES_COLLECTION_ID,
   // VIDEOS_COLLECTION_ID, // Only needed if interacting with videos collection
@@ -32,31 +31,39 @@ const {
 if (
   !APPWRITE_FUNCTION_ENDPOINT ||
   !APPWRITE_FUNCTION_PROJECT_ID ||
-  !APPWRITE_FUNCTION_API_KEY || // Check for API key
   !APPWRITE_DATABASE_ID ||
   !LIKES_COLLECTION_ID
   // !VIDEOS_COLLECTION_ID // Only needed if interacting with videos collection
 ) {
-  const errorMsg = 'FATAL: Missing required environment variables (Endpoint, ProjectID, API Key, DB ID, Likes Collection ID). Function cannot start.';
+  const errorMsg = 'FATAL: Missing required environment variables (Endpoint, ProjectID, DB ID, Likes Collection ID). Function cannot start.';
   console.error(`[Top Level] ${errorMsg}`);
   throw new Error(errorMsg);
 } else {
   console.log('[Top Level] Environment variables loaded successfully.');
 }
 
-// Initialize Appwrite client - uses API Key provided by runtime
-const client = new Client()
-  .setEndpoint(APPWRITE_FUNCTION_ENDPOINT)
-  .setProject(APPWRITE_FUNCTION_PROJECT_ID)
-  .setKey(APPWRITE_FUNCTION_API_KEY); // Use the key provided by the environment
-
-const databases = new Databases(client);
-// const account = new Account(client); // Remove - not needed for this logic
+// Client will be initialized inside the function using the API key from the request header
 
 // --- 2. Exported Default Function (CRON Job Handler) ---
 // This function runs when triggered by the CRON schedule.
-export default async ({ res, log, error }) => {
+export default async ({ req, res, log, error }) => {
   log('Starting scheduled cleanup of likes/dislikes...');
+
+  // --- Initialize Client Inside Function using Header ---
+  const apiKey = req?.headers ? req.headers['x-appwrite-key'] : null;
+
+  if (!apiKey) {
+    error('Missing required authentication key in x-appwrite-key header.');
+    return res.json({ success: false, message: 'Authentication key missing in request header.' }, 401); // Unauthorized
+  }
+
+  const client = new Client()
+    .setEndpoint(APPWRITE_FUNCTION_ENDPOINT)
+    .setProject(APPWRITE_FUNCTION_PROJECT_ID)
+    .setKey(apiKey); // Use the key from the header
+
+  const databases = new Databases(client);
+  // --- End Client Initialization ---
 
   // Map structure: Map<videoId, Map<userId, { id: string; createdAt: Date }[]>>
   const userVideoLikes = new Map();

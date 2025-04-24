@@ -16,7 +16,7 @@ def main(context):
     # Ensure environment variables are set
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    api_key = os.environ.get("APPWRITE_API_KEY")
+    api_key = context.req.headers.get('x-appwrite-key')
 
     if not all([api_endpoint, project_id, api_key]):
         context.error("Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY).")

@@ -353,7 +353,26 @@
             "name": "Video Counts",
             "enabled": true,
             "documentSecurity": false,
-            "attributes": [],
+            "attributes": [
+                {
+                    "key": "likeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                },
+                {
+                    "key": "dislikeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                }
+            ],
             "indexes": []
         }
     ],

@@ -166,8 +166,14 @@ def main(context):
                  # If atomic operations become available, use them.
 
                  video_doc = databases.get_document(DATABASE_ID, VIDEOS_COLLECTION_ID, video_id)
-                 current_likes = video_doc.get('likeCount', 0)
-                 current_dislikes = video_doc.get('dislikeCount', 0)
+                 
+                 # Get values, might be None
+                 current_likes = video_doc.get('likeCount') 
+                 current_dislikes = video_doc.get('dislikeCount')
+                 
+                 # Default to 0 if None or missing
+                 current_likes = current_likes if current_likes is not None else 0
+                 current_dislikes = current_dislikes if current_dislikes is not None else 0
 
                  new_like_count = max(0, current_likes + like_change)
                  new_dislike_count = max(0, current_dislikes + dislike_change)
@@ -199,4 +205,4 @@ def main(context):
 
     except Exception as e:
         context.error(f"Error processing like/dislike: {e}")
-        return context.res.status(500).json({"success": False, "message": f"Server error: {e}"})
+        return context.res.json({"success": False, "message": f"Server error: {e}"}, statusCode=500)

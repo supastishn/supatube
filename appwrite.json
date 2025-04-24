@@ -1,0 +1,302 @@
+{
+    "projectId": "supatube",
+    "projectName": "Supatube",
+    "settings": {
+        "services": {
+            "account": true,
+            "avatars": true,
+            "databases": true,
+            "locale": true,
+            "health": true,
+            "storage": true,
+            "teams": true,
+            "users": true,
+            "functions": true,
+            "graphql": true,
+            "messaging": true
+        },
+        "auth": {
+            "methods": {
+                "jwt": true,
+                "phone": true,
+                "invites": true,
+                "anonymous": true,
+                "email-otp": true,
+                "magic-url": true,
+                "email-password": true
+            },
+            "security": {
+                "duration": 31536000,
+                "limit": 0,
+                "sessionsLimit": 10,
+                "passwordHistory": 0,
+                "passwordDictionary": false,
+                "personalDataCheck": false,
+                "sessionAlerts": false,
+                "mockNumbers": []
+            }
+        }
+    },
+    "functions": [
+        {
+            "$id": "likes-manager",
+            "execute": [
+                "any"
+            ],
+            "name": "likes-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "users.read"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/likes-manager"
+        },
+        {
+            "$id": "videos-manager",
+            "execute": [
+                "any"
+            ],
+            "name": "video-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "users.read"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/video-manager"
+        }
+    ],
+    "databases": [
+        {
+            "$id": "database",
+            "name": "Database",
+            "enabled": true
+        }
+    ],
+    "collections": [
+        {
+            "$id": "videos",
+            "$permissions": [
+                "read(\"guests\")",
+                "create(\"users\")",
+                "read(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Videos",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "title",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null
+                },
+                {
+                    "key": "description",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null
+                },
+                {
+                    "key": "video_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 500,
+                    "default": null
+                },
+                {
+                    "key": "thumbnail_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 500,
+                    "default": null
+                },
+                {
+                    "key": "video_duration",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": 0,
+                    "max": 86400,
+                    "default": null
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "title",
+                    "type": "fulltext",
+                    "status": "available",
+                    "attributes": [
+                        "title"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ]
+                }
+            ]
+        },
+        {
+            "$id": "accounts",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "read(\"guests\")"
+            ],
+            "databaseId": "database",
+            "name": "accounts",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "bio",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 500,
+                    "default": null
+                },
+                {
+                    "key": "profileImageUrl",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 500,
+                    "default": null
+                },
+                {
+                    "key": "name",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "likes",
+            "$permissions": [
+                "create(\"any\")",
+                "read(\"any\")",
+                "update(\"any\")",
+                "delete(\"any\")"
+            ],
+            "databaseId": "database",
+            "name": "Likes/Dislikes",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 200,
+                    "default": null
+                },
+                {
+                    "key": "like",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -1,
+                    "max": 1,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "video_interactions",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "read(\"any\")"
+            ],
+            "databaseId": "database",
+            "name": "Video Interactions",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null
+                },
+                {
+                    "key": "type",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 10,
+                    "default": null
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "videoId_index",
+                    "type": "key",
+                    "status": "available",
+                    "attributes": [
+                        "videoId"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ]
+                }
+            ]
+        },
+        {
+            "$id": "video_counts",
+            "$permissions": [],
+            "databaseId": "database",
+            "name": "Video Counts",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [],
+            "indexes": []
+        }
+    ],
+    "buckets": [
+        {
+            "$id": "videos",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "read(\"guests\")"
+            ],
+            "fileSecurity": true,
+            "name": "videos",
+            "enabled": true,
+            "maximumFileSize": 5000000000,
+            "allowedFileExtensions": [],
+            "compression": "none",
+            "encryption": false,
+            "antivirus": true
+        }
+    ]
+}

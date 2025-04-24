@@ -177,6 +177,24 @@
                     "max": 86400,
                     "default": null
                 },
+                {
+                    "key": "likeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                },
+                {
+                    "key": "dislikeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                }
             ],
             "indexes": [
                 {
@@ -234,15 +252,15 @@
         {
             "$id": "likes",
             "$permissions": [
-                "create(\"users\")",
-                "read(\"users\")",
-                "update(\"users\")",
-                "delete(\"users\")"
+                "create(\"any\")",
+                "read(\"any\")",
+                "update(\"any\")",
+                "delete(\"any\")"
             ],
             "databaseId": "database",
             "name": "Likes",
             "enabled": true,
-            "documentSecurity": true,
+            "documentSecurity": false,
             "attributes": [
                 {
                     "key": "userId",
@@ -330,35 +348,12 @@
         },
         {
             "$id": "video_counts",
-            "$permissions": [
-                "read(\"any\")",
-                "create(\"functions\")",
-                "update(\"functions\")"
-            ],
+            "$permissions": [],
             "databaseId": "database",
             "name": "Video Counts",
             "enabled": true,
             "documentSecurity": false,
-            "attributes": [
-                {
-                    "key": "likeCount",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": 0,
-                    "max": 999999999,
-                    "default": 0
-                },
-                {
-                    "key": "dislikeCount",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": 0,
-                    "max": 999999999,
-                    "default": 0
-                }
-            ],
+            "attributes": [],
             "indexes": []
         }
     ],

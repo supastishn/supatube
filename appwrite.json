@@ -265,22 +265,6 @@
                     "array": false,
                     "size": 100,
                     "default": null
-                },
-                {
-                    "key": "videosLiked",
-                    "type": "string",
-                    "required": false,
-                    "array": true,
-                    "size": 255,
-                    "default": []
-                },
-                {
-                    "key": "videosDisliked",
-                    "type": "string",
-                    "required": false,
-                    "array": true,
-                    "size": 255,
-                    "default": []
                 }
             ],
             "indexes": []
@@ -384,7 +368,9 @@
         },
         {
             "$id": "video_counts",
-            "$permissions": [],
+            "$permissions": [
+                "read(\"any\")"
+            ],
             "databaseId": "database",
             "name": "Video Counts",
             "enabled": true,

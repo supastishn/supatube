@@ -72,6 +72,19 @@ def main(context):
             raise ValueError(f"Comment exceeds maximum length of {MAX_COMMENT_LENGTH} characters.")
         context.log(f"Video ID: {video_id}, Parent ID: {parent_comment_id}, Text: '{comment_text[:50]}...'")
 
+        # 3. Validate Parent ID (Ensure it's a top-level comment)
+        if parent_comment_id:
+            is_top_level_parent = False
+            for top_comment in comments_list: # comments_list holds only top-level comments initially
+                if top_comment.get('commentId') == parent_comment_id:
+                    is_top_level_parent = True
+                    break # Found the top-level parent
+
+            if not is_top_level_parent:
+                context.log(f"Error: Attempt to reply to a non-top-level comment or invalid parent ID: {parent_comment_id}")
+                return context.res.json({"success": "false", "message": "Replying to replies is not allowed."}, 400)
+            context.log(f"Parent ID {parent_comment_id} confirmed as top-level.")
+
     except Exception as e:
         return context.res.json({"success": "false", "message": f"Invalid request: {e}"}, 400)
 

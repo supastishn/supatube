@@ -756,6 +756,7 @@ const VideoDetail = () => {
                   comment={comment}
                   videoId={videoId}
                   onReplyPosted={loadComments}
+                  depth={0} // Explicitly set depth=0 for top-level comments
                 />
               ))}
             </div>

@@ -14,7 +14,7 @@ const formatTimeAgo = (dateString) => {
   }
 };
 
-const Comment = ({ comment, videoId, onReplyPosted }) => {
+const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -82,7 +82,7 @@ const Comment = ({ comment, videoId, onReplyPosted }) => {
         <p className="comment-text">{commentText}</p>
         {/* Comment Actions */}
         <div className="comment-actions">
-          {currentUser && ( // Only show reply button if logged in
+          {currentUser && depth === 0 && ( // Only show reply button if logged in and top-level comment
             <button className="reply-button" onClick={() => setShowReplyInput(!showReplyInput)}>
               Reply
             </button>
@@ -90,7 +90,7 @@ const Comment = ({ comment, videoId, onReplyPosted }) => {
         </div>
 
         {/* Reply Input Form */}
-        {showReplyInput && (
+        {depth === 0 && showReplyInput && (
           <form onSubmit={handlePostReply} className="reply-form">
             <textarea
               value={replyText}
@@ -122,6 +122,7 @@ const Comment = ({ comment, videoId, onReplyPosted }) => {
                 comment={reply}
                 videoId={videoId} // Pass props down
                 onReplyPosted={onReplyPosted} // Pass props down
+                depth={depth + 1} // Increment depth for replies
               />
             ))}
           </div>

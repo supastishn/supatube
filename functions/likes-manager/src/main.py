@@ -175,20 +175,25 @@ def main(context):
 
         # 5. Update the user's account document
         try:
+            # --- Verify Data Payload ---
+            # Ensure ONLY 'videosLiked' and 'videosDisliked' are sent for the 'accounts' update
+            account_update_data = {
+                'videosLiked': updated_liked_list,
+                'videosDisliked': updated_disliked_list
+            }
+            context.log(f"Attempting to update ACCOUNTS collection document {user_id} with data: {account_update_data}")
+
             databases.update_document(
                 database_id=DATABASE_ID,
-                collection_id=ACCOUNTS_COLLECTION_ID,
+                collection_id=ACCOUNTS_COLLECTION_ID, # Targeting the accounts collection
                 document_id=user_id,
-                data={
-                    'videosLiked': updated_liked_list,
-                    'videosDisliked': updated_disliked_list
-                    # ONLY include attributes belonging to the 'accounts' collection
-                }
+                data=account_update_data # Use the verified data payload
             )
             context.log(f"Successfully updated account document for user {user_id}")
         except AppwriteException as e:
             context.error(f"Failed to update account document for user {user_id}: {e}")
             # If updating the arrays fails, we should probably stop and report error
+            # The error message below matches the traceback seen previously
             raise Exception(f"Failed to save updated like/dislike status: {e.message}")
 
         # 6. Update counts on the 'video_counts' collection (same logic as before)

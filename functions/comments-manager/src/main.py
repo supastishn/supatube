@@ -96,6 +96,11 @@ def main(context):
             current_like_count = counts_doc.get('likeCount', 0)
             current_dislike_count = counts_doc.get('dislikeCount', 0)
 
+            # Explicitly handle potential None values returned by .get() if attribute exists but is null
+            current_comment_count = current_comment_count if isinstance(current_comment_count, int) else 0
+            current_like_count = current_like_count if isinstance(current_like_count, int) else 0
+            current_dislike_count = current_dislike_count if isinstance(current_dislike_count, int) else 0
+
             try:
                 comments_list = json.loads(comments_json_string)
                 if not isinstance(comments_list, list):

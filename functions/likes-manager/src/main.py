@@ -19,15 +19,15 @@ def main(context):
     # --- Environment Variable Check ---
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    # API Key is crucial for batch functions needing broad access
-    api_key = os.environ.get("APPWRITE_FUNCTION_API_KEY")
+    # API key comes from header instead of environment variable
+    api_key = context.req.headers.get('x-appwrite-key')
 
-    if not all([api_endpoint, project_id, api_key]):
-        message = "Function configuration error: Missing endpoint, project ID, or API key."
+    if not all([api_endpoint, project_id]) or not api_key:
+        message = "Function configuration error: Missing endpoint, project ID in env, or x-appwrite-key header."
         context.error(message)
         return context.res.json({"success": False, "message": message}, 500)
 
-    # --- Initialize Appwrite Client (using API Key) ---
+    # --- Initialize Appwrite Client (using API Key from header) ---
     client = Client()
     client.set_endpoint(api_endpoint).set_project(project_id).set_key(api_key)
     databases = Databases(client)

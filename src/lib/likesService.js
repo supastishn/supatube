@@ -26,7 +26,7 @@ export const toggleLikeDislike = async (videoId, action) => {
         videoId: videoId,
         action: action,
       }),
-      true, // async = false (wait for response)
+      false, // async = false (wait for response)
       '/', // path (use default '/')
       'POST' // method (important!)
     );

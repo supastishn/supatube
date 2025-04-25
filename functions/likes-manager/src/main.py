@@ -182,6 +182,7 @@ def main(context):
                 data={
                     'videosLiked': updated_liked_list,
                     'videosDisliked': updated_disliked_list
+                    # ONLY include attributes belonging to the 'accounts' collection
                 }
             )
             context.log(f"Successfully updated account document for user {user_id}")
@@ -248,7 +249,7 @@ def main(context):
 
     except Exception as e:
         error_message = f"Unexpected error processing like/dislike: {e}"
-        context.error(error_message, exc_info=True) # Log full traceback
+        context.error(error_message) # Log only the message
         response_payload = {"success": "false", "message": f"Server error: {e}"}
         response_status = 500
         # --- Log Response Before Returning ---

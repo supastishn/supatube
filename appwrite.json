@@ -134,6 +134,26 @@
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/test"
+        },
+        {
+            "$id": "subscriptions-manager",
+            "execute": [
+                "users"
+            ],
+            "name": "subscriptions-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "users.read"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/subscriptions-manager"
         }
     ],
     "databases": [
@@ -272,7 +292,7 @@
                     "required": true,
                     "array": true,
                     "size": 255,
-                    "default": []
+                    "default": null
                 },
                 {
                     "key": "videosDisliked",
@@ -280,7 +300,7 @@
                     "required": true,
                     "array": true,
                     "size": 255,
-                    "default": []
+                    "default": null
                 }
             ],
             "indexes": []

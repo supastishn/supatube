@@ -154,6 +154,50 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserLikeDislikeState = (videoId, action) => {
+    setUser(currentUser => {
+      if (!currentUser) return null;
+
+      const currentLiked = new Set(currentUser.videosLiked || []);
+      const currentDisliked = new Set(currentUser.videosDisliked || []);
+      let changed = false;
+
+      if (action === 'like') {
+        if (currentLiked.has(videoId)) { // Toggle like off
+          currentLiked.delete(videoId);
+          changed = true;
+        } else { // Add like (remove dislike if present)
+          currentLiked.add(videoId);
+          if (currentDisliked.has(videoId)) {
+            currentDisliked.delete(videoId);
+          }
+          changed = true;
+        }
+      } else if (action === 'dislike') {
+        if (currentDisliked.has(videoId)) { // Toggle dislike off
+          currentDisliked.delete(videoId);
+          changed = true;
+        } else { // Add dislike (remove like if present)
+          currentDisliked.add(videoId);
+          if (currentLiked.has(videoId)) {
+            currentLiked.delete(videoId);
+          }
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        console.log(`[AuthContext] Updated client state for ${videoId}, action ${action}. New Likes: ${currentLiked.size}, Dislikes: ${currentDisliked.size}`);
+        return {
+          ...currentUser,
+          videosLiked: Array.from(currentLiked),
+          videosDisliked: Array.from(currentDisliked)
+        };
+      }
+      return currentUser; // No change
+    });
+  };
+
   const value = {
     user,
     loading,
@@ -163,6 +207,7 @@ export const AuthProvider = ({ children }) => {
     getAvatarUrl,
     checkUserStatus,
     updateUserProfile,
+    updateUserLikeDislikeState,
     account,
   };
 

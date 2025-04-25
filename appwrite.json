@@ -85,11 +85,9 @@
                 "migrations.read",
                 "migrations.write"
             ],
-            "events": [
-                "databases.database.collections.video_interactions.documents.create"
-            ],
-            "schedule": "",
-            "timeout": 15,
+            "events": [],
+            "schedule": "0 * * * *",
+            "timeout": 30,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",

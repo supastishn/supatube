@@ -40,7 +40,7 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
-  const { user: currentUser } = useAuth(); // Get current user
+  const { user: currentUser, updateUserLikeDislikeState } = useAuth(); // Get current user and like/dislike updater
   const navigate = useNavigate(); // For redirecting to sign-in
 
   const [video, setVideo] = useState(null);
@@ -77,66 +77,61 @@ const VideoDetail = () => {
   
   // Handle like/dislike button clicks
   const handleLikeDislike = useCallback(async (action) => {
-    // If not logged in, redirect to sign in
     if (!currentUser) {
-      // Pass the intended return path correctly
       navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
       return;
     }
+    if (isLiking) return;
 
-    if (isLiking) return; // Prevent multiple clicks
     setIsLiking(true);
-    setLikeError(''); // Clear previous like errors
+    setLikeError('');
 
-    // --- Store previous state for rollback ---
-    const previousStatus = userLikeStatus;
+    // Store previous local count state for potential *count* rollback
     const previousLikeCount = likeCount;
     const previousDislikeCount = dislikeCount;
 
-    // --- Perform Optimistic Update ---
-    let optimisticStatus = 0; // Default to 0 (no interaction)
-    let optimisticLikeChange = 0;
-    let optimisticDislikeChange = 0;
+    // 1. Update AuthContext state IMMEDIATELY
+    updateUserLikeDislikeState(videoId, action);
 
+    // 2. Optimistically update LOCAL counts for UI feedback
+    // This logic calculates the *change* caused by the current click
     if (action === 'like') {
-      if (previousStatus === 1) { // Toggling like off (was 1, becomes 0)
-        optimisticStatus = 0; optimisticLikeChange = -1;
-      } else { // Liking (or changing from dislike) (becomes 1)
-        optimisticStatus = 1; optimisticLikeChange = 1;
-        if (previousStatus === -1) { optimisticDislikeChange = -1; } // Was disliked (-1)
-      }
+        if (userLikeStatus === 1) { // Was liked, now toggling off
+            setLikeCount(prev => Math.max(0, prev - 1));
+        } else { // Was neutral or disliked, now liking
+            setLikeCount(prev => prev + 1);
+            if (userLikeStatus === -1) {
+                setDislikeCount(prev => Math.max(0, prev - 1)); // Remove dislike count too
+            }
+        }
     } else { // action === 'dislike'
-      if (previousStatus === -1) { // Toggling dislike off (was -1, becomes 0)
-        optimisticStatus = 0; optimisticDislikeChange = -1;
-      } else { // Disliking (or changing from like) (becomes -1)
-        optimisticStatus = -1; optimisticDislikeChange = 1;
-        if (previousStatus === 1) { optimisticLikeChange = -1; } // Was liked (1)
-      }
+        if (userLikeStatus === -1) { // Was disliked, now toggling off
+            setDislikeCount(prev => Math.max(0, prev - 1));
+        } else { // Was neutral or liked, now disliking
+            setDislikeCount(prev => prev + 1);
+            if (userLikeStatus === 1) {
+                setLikeCount(prev => Math.max(0, prev - 1)); // Remove like count too
+            }
+        }
     }
 
-    // Apply optimistic updates to UI state immediately
-    setUserLikeStatus(optimisticStatus);
-    setLikeCount(prev => Math.max(0, prev + optimisticLikeChange));
-    setDislikeCount(prev => Math.max(0, prev + optimisticDislikeChange));
-
-    // --- Call Backend Service to RECORD the interaction ---
+    // 3. Call Backend Service to RECORD the interaction for the cron job
     try {
-      // Pass videoId, action, AND the current user's ID
       await toggleLikeDislike(videoId, action, currentUser.$id);
       console.log(`[VideoDetail] Interaction ${action} recorded successfully for video ${videoId}`);
-      // Recording successful. Rely on optimistic state + Realtime for final truth.
+      // No state updates needed here, client is already updated
 
     } catch (error) {
-      console.error(`Failed to ${action} video:`, error);
-      // --- FAILURE: Revert UI state ---
-      setUserLikeStatus(previousStatus);
+      console.error(`Failed to record ${action} interaction:`, error);
+      // Revert optimistic LOCAL count updates ONLY if recording fails
       setLikeCount(previousLikeCount);
       setDislikeCount(previousDislikeCount);
-      setLikeError(error.message || `Failed to update ${action} status.`);
+      setLikeError(error.message || `Failed to record ${action}. Your preference is saved locally.`);
+      // DO NOT revert the AuthContext state change.
     } finally {
-      setIsLiking(false); // Re-enable buttons
+      setIsLiking(false);
     }
-  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, setUserLikeStatus, setLikeCount, setDislikeCount, setLikeError, setIsLiking]);
+  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, updateUserLikeDislikeState, setIsLiking, setLikeError, setLikeCount, setDislikeCount]);
 
   // Video deletion handler
   const handleDeleteVideo = async () => {
@@ -682,7 +677,7 @@ const VideoDetail = () => {
             <div className="video-actions">
               {/* Like Button */}
               <button
-                className={`video-action-btn like-btn ${userLikeStatus === 1 ? 'active' : ''}`}
+                className={`video-action-btn like-btn ${currentUser && (currentUser.videosLiked || []).includes(videoId) ? 'active' : ''}`}
                 onClick={() => {
                   console.log('Like button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
                   if (typeof handleLikeDislike === 'function') {
@@ -692,8 +687,8 @@ const VideoDetail = () => {
                   }
                 }}
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={userLikeStatus === 1}
-                title={userLikeStatus === 1 ? 'Unlike' : 'I like this'}
+                aria-pressed={currentUser && (currentUser.videosLiked || []).includes(videoId)}
+                title={currentUser && (currentUser.videosLiked || []).includes(videoId) ? 'Unlike' : 'I like this'}
               >
                 <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                   <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>
@@ -704,7 +699,7 @@ const VideoDetail = () => {
 
               {/* Dislike Button */}
               <button
-                className={`video-action-btn dislike-btn ${userLikeStatus === -1 ? 'active' : ''}`}
+                className={`video-action-btn dislike-btn ${currentUser && (currentUser.videosDisliked || []).includes(videoId) ? 'active' : ''}`}
                 onClick={() => {
                   console.log('Dislike button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
                   if (typeof handleLikeDislike === 'function') {
@@ -714,8 +709,8 @@ const VideoDetail = () => {
                   }
                 }}
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={userLikeStatus === -1}
-                title={userLikeStatus === -1 ? 'Remove dislike' : 'I dislike this'}
+                aria-pressed={currentUser && (currentUser.videosDisliked || []).includes(videoId)}
+                title={currentUser && (currentUser.videosDisliked || []).includes(videoId) ? 'Remove dislike' : 'I dislike this'}
               >
                  <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                    <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v1.91l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"></path>

@@ -27,12 +27,13 @@ export const AuthProvider = ({ children }) => {
         bio: doc.bio,
         profileImageUrl: doc.profileImageUrl,
         videosLiked: doc.videosLiked || [], // Add this, default to empty array
-        videosDisliked: doc.videosDisliked || [] // Add this, default to empty array
+        videosDisliked: doc.videosDisliked || [], // Add this, default to empty array
+        subscribingTo: doc.subscribingTo || [] // Add subscribingTo field
       };
     } catch (error) {
       // Handle 404 Not Found specifically - means no profile doc exists yet
       if (error.code === 404) {
-        return { bio: '', profileImageUrl: null, videosLiked: [], videosDisliked: [] }; // Add defaults
+        return { bio: '', profileImageUrl: null, videosLiked: [], videosDisliked: [], subscribingTo: [] }; // Add defaults
       }
       console.error("Failed to fetch account details:", error);
       // Return defaults for other errors

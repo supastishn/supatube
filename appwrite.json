@@ -272,7 +272,7 @@
                     "required": false,
                     "array": true,
                     "size": 255,
-                    "default": []
+                    "default": ""
                 },
                 {
                     "key": "videosDisliked",
@@ -280,7 +280,7 @@
                     "required": false,
                     "array": true,
                     "size": 255,
-                    "default": []
+                    "default": ""
                 }
             ],
             "indexes": []

@@ -8,7 +8,7 @@ import { toggleLikeDislike } from '../lib/likesService'; // Import like service
 import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
 import Comment from '../components/Comment'; // Add this
 import { postComment, fetchCommentsForVideo } from '../lib/commentService'; // Add this
-import { deleteVideo } from '../lib/videoService'; // Add this
+import { deleteVideo } from '../lib/videoService'; // Import video deletion function
 
 // Appwrite Imports
 import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
@@ -138,6 +138,32 @@ const VideoDetail = () => {
       setIsLiking(false); // Re-enable buttons
     }
   }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, setUserLikeStatus, setLikeCount, setDislikeCount, setLikeError, setIsLiking]);
+
+  // Video deletion handler
+  const handleDeleteVideo = async () => {
+    if (!video || !video.id || isDeleting) return;
+
+    const confirmDelete = window.confirm("Are you sure you want to delete this video? This cannot be undone.");
+    if (!confirmDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      const result = await deleteVideo(video.id);
+      console.log('Video deleted successfully:', result.message);
+      // On success, navigate away (e.g., to home)
+      alert('Video deleted successfully!'); // Simple feedback
+      navigate('/'); // Redirect to home page
+    } catch (error) {
+      console.error('Failed to delete video:', error);
+      setDeleteError(error.message || 'Could not delete the video. Please try again.');
+      setIsDeleting(false); // Stop loading on error
+    }
+    // No finally needed as we navigate away on success
+  };
 
   // Subscribe/unsubscribe toggle handler
   const handleSubscribeToggle = useCallback(async () => {
@@ -689,10 +715,28 @@ const VideoDetail = () => {
                  </svg>
                 Save
               </button>
+
+              {/* --- Delete Button (Owner Only) --- */}
+              {currentUser && video?.channel?.creatorUserId === currentUser.$id && (
+                <button
+                  className="video-action-btn delete-btn" // Add specific class if needed for styling
+                  onClick={handleDeleteVideo}
+                  disabled={isDeleting}
+                  title="Delete this video"
+                  style={{ backgroundColor: 'var(--primary)', color: 'white', marginLeft: 'auto' }} // Push to right & Style
+                >
+                  <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
+                  </svg>
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              )}
             </div>
           </div>
           {/* Display Like/Dislike Error */}
           {likeError && <p className="like-error-message">{likeError}</p>}
+          {/* Display Delete Error */}
+          {deleteError && <p className="error-message" style={{ color: 'red', width: '100%', marginTop: '8px' }}>{deleteError}</p>}
         </div>
 
         {/* Channel Info and Description Box */}

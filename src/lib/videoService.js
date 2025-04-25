@@ -29,7 +29,7 @@ export const deleteVideo = async (videoId) => {
 
     // Check if the function execution itself failed (e.g., timeout, internal error)
     if (result.status === 'failed') {
-      console.error('Video deletion function execution failed:', result.stderr || result.response);
+      console.error('Video deletion function execution failed:', result.stderr || result.responseBody); // Log stderr or body
       let funcErrorMsg = 'Video deletion function execution failed.';
       // Try to parse a more specific error message from the function's response body
       try {

@@ -7,7 +7,7 @@ from appwrite.role import Role
 import os
 import json
 
-# Configuration Constants (Match your project)
+# Configuration Constants (Match your project - appwriteConfig.js)
 DATABASE_ID = "database"
 VIDEOS_COLLECTION_ID = "videos"
 STORAGE_VIDEOS_BUCKET_ID = "videos"
@@ -18,13 +18,14 @@ def main(context):
     # --- Environment & Auth Check ---
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    api_key = context.req.headers.get('x-appwrite-key') # Function uses API key for elevated access
+    # API key comes from header, set by SDK when calling function
+    api_key = context.req.headers.get('x-appwrite-key')
     user_id = context.req.headers.get('x-appwrite-user-id') # User triggering the function
 
     if not all([api_endpoint, project_id, api_key]):
-        message = "Function configuration error (missing env vars)."
+        message = "Function configuration error (missing env vars or API key)."
         context.error(message)
-        return context.res.json({"success": False, "message": message}, 500) # Use False boolean
+        return context.res.json({"success": False, "message": message}, 500)
 
     if not user_id:
         message = "Authentication required."
@@ -47,6 +48,7 @@ def main(context):
         return context.res.json({"success": False, "message": str(e)}, 400)
 
     # --- Initialize Appwrite Client ---
+    # Use API key for elevated privileges to delete files/docs
     client = Client()
     client.set_endpoint(api_endpoint).set_project(project_id).set_key(api_key)
     databases = Databases(client)
@@ -59,8 +61,9 @@ def main(context):
         context.log(f"Video document fetched successfully.")
 
         # --- Authorization Check ---
+        # Check if the calling user has 'update' permission on the document
         permissions = video_doc.get('$permissions', [])
-        required_permission = f'update("user:{user_id}")' # Check for update permission
+        required_permission = f'update("user:{user_id}")'
 
         if required_permission not in permissions:
             message = f"User {user_id} does not have permission to delete video {video_id_to_delete}."
@@ -68,7 +71,7 @@ def main(context):
             return context.res.json({"success": False, "message": "Forbidden: You do not own this video."}, 403)
         context.log(f"User {user_id} authorized to delete video {video_id_to_delete}.")
 
-        # --- Get File IDs ---
+        # --- Get File IDs from the fetched document ---
         video_file_id = video_doc.get('video_id')
         thumbnail_file_id = video_doc.get('thumbnail_id')
         context.log(f"Video File ID: {video_file_id}, Thumbnail File ID: {thumbnail_file_id}")
@@ -81,7 +84,10 @@ def main(context):
                 storage.delete_file(STORAGE_VIDEOS_BUCKET_ID, video_file_id)
                 context.log(f"Successfully deleted video file: {video_file_id}")
             except AppwriteException as e:
-                context.log(f"Warning: Failed to delete video file {video_file_id}. Code: {e.code}, Message: {e.message}. Continuing...")
+                if e.code != 404: # Log error if it's not "Not Found"
+                     context.log(f"Warning: Failed to delete video file {video_file_id}. Code: {e.code}, Message: {e.message}. Continuing...")
+                else:
+                     context.log(f"Video file {video_file_id} not found (already deleted?). Continuing...")
         else:
             context.log("No video file ID found in document.")
 
@@ -92,7 +98,10 @@ def main(context):
                 storage.delete_file(STORAGE_VIDEOS_BUCKET_ID, thumbnail_file_id)
                 context.log(f"Successfully deleted thumbnail file: {thumbnail_file_id}")
             except AppwriteException as e:
-                context.log(f"Warning: Failed to delete thumbnail file {thumbnail_file_id}. Code: {e.code}, Message: {e.message}. Continuing...")
+                if e.code != 404: # Log error if it's not "Not Found"
+                    context.log(f"Warning: Failed to delete thumbnail file {thumbnail_file_id}. Code: {e.code}, Message: {e.message}. Continuing...")
+                else:
+                    context.log(f"Thumbnail file {thumbnail_file_id} not found (already deleted?). Continuing...")
         else:
             context.log("No thumbnail file ID found in document.")
 
@@ -102,13 +111,13 @@ def main(context):
         context.log(f"Successfully deleted video document: {video_id_to_delete}")
 
         # --- Success Response ---
-        response_payload = {"success": True, "message": "Video deleted successfully."} # Use True boolean
+        response_payload = {"success": True, "message": "Video deleted successfully."}
         context.log(f"Operation successful. Returning: {response_payload}")
         context.log("--- Video Deletion Manager Invocation End (Success) ---")
         return context.res.json(response_payload)
 
     except AppwriteException as e:
-        # Handle specific errors like document not found
+        # Handle specific errors like document not found during initial fetch
         if e.code == 404:
              message = f"Video document {video_id_to_delete} not found."
              context.error(message)

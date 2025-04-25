@@ -143,10 +143,10 @@ def main(context):
              return context.res.json({"success": "false", "message": message}, 404)
         else:
             message = f"Database error: {e.message}"
-            context.error(message, exc_info=True)
+            context.error(message)
             return context.res.json({"success": "false", "message": message}, 500)
     except Exception as e:
         # Catch any other unexpected errors
         message = f"Unexpected server error: {e}"
-        context.error(message, exc_info=True)
+        context.error(message)
         return context.res.json({"success": "false", "message": message}, 500)

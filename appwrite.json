@@ -105,7 +105,9 @@
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [
-                "users.read"
+                "users.read",
+                "documents.read",
+                "documents.write"
             ],
             "events": [],
             "schedule": "",

@@ -352,46 +352,31 @@ const VideoDetail = () => {
     fetchCounts();
   }, [videoId]); // Re-run when videoId changes
 
-  // --- Effect to fetch user's like status ---
+  // --- Effect to derive initial like status from user context ---
   useEffect(() => {
-    // Fetch like status only if video data is loaded and user is logged in
-    if (videoId && currentUser?.$id) {
-      const fetchUserLikeStatus = async () => {
-        try {
-          const response = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.likesCollectionId,
-            [
-              Query.equal('userId', currentUser.$id),
-              Query.equal('videoId', videoId),
-              Query.limit(1) // We only need one record max
-            ]
-          );
+    console.log("[VideoDetail Effect] Deriving like status from user context.");
+    if (currentUser && videoId) {
+      // Safely access arrays, default to empty if they don't exist on the user object yet
+      const liked = (currentUser.videosLiked || []).includes(videoId);
+      const disliked = (currentUser.videosDisliked || []).includes(videoId);
 
-          if (response.documents.length > 0) {
-            const statusType = response.documents[0].type;
-            setUserLikeStatus(statusType === 'like' ? 1 : (statusType === 'dislike' ? -1 : 0)); // Map string to integer
-          } else {
-            setUserLikeStatus(0); // No record found means status is 0 (null)
-          }
-        } catch (err) {
-          // Handle common errors like collection not found during setup
-          if (err.code === 404 && err.message.includes('Collection')) {
-             console.warn("Like status check failed: 'likes' collection not found. Did you deploy it?");
-          } else {
-             console.error("Failed to fetch user's like status:", err);
-          }
-          // Don't set page error, just log it. Lack of status isn't page-breaking.
-          setUserLikeStatus(0);
-        }
-      };
-
-      fetchUserLikeStatus();
+      if (liked) {
+        console.log(`[VideoDetail Effect] Video ${videoId} found in currentUser.videosLiked`);
+        setUserLikeStatus(1);
+      } else if (disliked) {
+        console.log(`[VideoDetail Effect] Video ${videoId} found in currentUser.videosDisliked`);
+        setUserLikeStatus(-1);
+      } else {
+        console.log(`[VideoDetail Effect] Video ${videoId} not found in liked/disliked arrays.`);
+        setUserLikeStatus(0);
+      }
     } else {
-      // If user logs out or videoId changes, reset status
+      // Not logged in or videoId not available yet
+      console.log(`[VideoDetail Effect] User not logged in or videoId missing. Setting status to 0.`);
       setUserLikeStatus(0);
     }
-  }, [videoId, currentUser]); // Re-run when video or user changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, videoId]); // Rerun when user data or videoId changes
 
   // --- Render States ---
 

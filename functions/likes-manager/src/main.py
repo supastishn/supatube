@@ -10,6 +10,7 @@ import json
 DATABASE_ID = "database"
 LIKES_COLLECTION_ID =  "likes"
 VIDEO_COUNTS_COLLECTION_ID = "video_counts"
+ACCOUNTS_COLLECTION_ID = "accounts"
 
 # This is executed when the function is triggered
 def main(context):
@@ -93,135 +94,109 @@ def main(context):
     new_status = None # 'like', 'dislike', or None
 
     try:
-        # === Start Core Logic ===
-        context.log(f"Checking existing like status for user {user_id} on video {video_id}...")
+        # === Start Core Logic (v2 - Using accounts collection arrays) ===
+        context.log(f"Fetching account details for user {user_id}...")
 
-        # 1. Find existing like/dislike by the user for this video
-        existing_like_doc = None
+        # 1. Get user's account document
+        account_doc = None
+        videos_liked = []
+        videos_disliked = []
         try:
-            response = databases.list_documents(
-                database_id=DATABASE_ID,
-                collection_id=LIKES_COLLECTION_ID,
-                queries=[
-                    Query.equal("userId", user_id),
-                    Query.equal("videoId", video_id),
-                    Query.limit(1)
-                ]
-            )
-            if response['total'] > 0:
-                existing_like_doc = response['documents'][0]
-                context.log(f"Found existing like document: {existing_like_doc['$id']} with type '{existing_like_doc['type']}'")
-            else:
-                context.log("No existing like document found.")
+            account_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id)
+            # Ensure arrays exist and are lists, handle None/null from potential older docs or missing attributes
+            videos_liked = account_doc.get('videosLiked', []) or []
+            videos_disliked = account_doc.get('videosDisliked', []) or []
+            context.log(f"Fetched account doc. Liked: {len(videos_liked)} videos, Disliked: {len(videos_disliked)} videos.")
         except AppwriteException as e:
-            if e.code != 404:
-                context.error(f"Error querying likes collection: {e}")
-                raise Exception(f"Database error checking like status: {e.message}")
+            if e.code == 404:
+                # This should ideally not happen if user is authenticated via Appwrite & registered
+                context.error(f"CRITICAL: Account document not found for authenticated user {user_id}. Cannot proceed.")
+                raise Exception(f"User account details document missing for user {user_id}.")
             else:
-                context.log("'likes' collection query returned 404.")
+                context.error(f"Error fetching account document for user {user_id}: {e}")
+                raise Exception(f"Database error fetching account details: {e.message}")
 
+        # 2. Determine current status based on arrays
+        current_status = None
+        if video_id in videos_liked:
+            current_status = 'liked'
+        elif video_id in videos_disliked:
+            current_status = 'disliked'
+        context.log(f"Current status for video {video_id}: {current_status}")
 
-        # 2. Determine changes based on action and current state
+        # 3. Determine changes based on action and current state
+        like_change = 0         # For video_counts update
+        dislike_change = 0      # For video_counts update
+        new_status = None       # 'liked', 'disliked', or None (final state for account arrays)
+
         if action == 'like':
-            if existing_like_doc is None:
-                # Create new 'like'
-                like_change = 1
-                new_status = 'liked'
-            elif existing_like_doc['type'] == 'dislike':
-                # Change 'dislike' to 'like'
+            if current_status == 'liked':       # Toggle like off
+                like_change = -1
+                new_status = None
+            elif current_status == 'disliked':  # Change dislike to like
                 like_change = 1
                 dislike_change = -1
                 new_status = 'liked'
-            else: # type == 'like'
-                # Remove 'like' (toggle off)
-                like_change = -1
-                new_status = None
+            else:                               # Add new like
+                like_change = 1
+                new_status = 'liked'
         else: # action == 'dislike'
-            if existing_like_doc is None:
-                # Create new 'dislike'
-                dislike_change = 1
-                new_status = 'disliked'
-            elif existing_like_doc['type'] == 'like':
-                # Change 'like' to 'dislike'
+            if current_status == 'disliked':    # Toggle dislike off
+                dislike_change = -1
+                new_status = None
+            elif current_status == 'liked':     # Change like to dislike
                 like_change = -1
                 dislike_change = 1
                 new_status = 'disliked'
-            else: # type == 'dislike'
-                # Remove 'dislike' (toggle off)
-                dislike_change = -1
-                new_status = None
+            else:                               # Add new dislike
+                dislike_change = 1
+                new_status = 'disliked'
         context.log(f"Determined changes: like_change={like_change}, dislike_change={dislike_change}, new_status={new_status}")
 
-        # 3. Apply changes to the 'likes' collection
-        context.log("Applying changes to 'likes' collection...")
-        if new_status == 'liked':
-            if existing_like_doc and existing_like_doc['type'] == 'dislike':
-                 context.log(f"Updating like doc {existing_like_doc['$id']} from dislike to like.")
-                 # Update existing dislike to like
-                 databases.update_document(
-                    database_id=DATABASE_ID,
-                    collection_id=LIKES_COLLECTION_ID,
-                    document_id=existing_like_doc['$id'],
-                    data={'type': 'like'}
-                 )
-            elif existing_like_doc is None:
-                 context.log("Creating new 'like' document.")
-                 # Create new like document
-                 databases.create_document(
-                    database_id=DATABASE_ID,
-                    collection_id=LIKES_COLLECTION_ID,
-                    document_id='unique()', # Let Appwrite generate ID
-                    data={'userId': user_id, 'videoId': video_id, 'type': 'like'},
-                    permissions=[
-                        Permission.read(Role.user(user_id)),
-                        Permission.update(Role.user(user_id)),
-                        Permission.delete(Role.user(user_id))
-                    ]
-                 )
-        elif new_status == 'disliked':
-            if existing_like_doc and existing_like_doc['type'] == 'like':
-                 context.log(f"Updating like doc {existing_like_doc['$id']} from like to dislike.")
-                 # Update existing like to dislike
-                 databases.update_document(
-                    database_id=DATABASE_ID,
-                    collection_id=LIKES_COLLECTION_ID,
-                    document_id=existing_like_doc['$id'],
-                    data={'type': 'dislike'}
-                 )
-            elif existing_like_doc is None:
-                 context.log("Creating new 'dislike' document.")
-                 # Create new dislike document
-                 databases.create_document(
-                    database_id=DATABASE_ID,
-                    collection_id=LIKES_COLLECTION_ID,
-                    document_id='unique()',
-                    data={'userId': user_id, 'videoId': video_id, 'type': 'dislike'},
-                     permissions=[
-                        Permission.read(Role.user(user_id)),
-                        Permission.update(Role.user(user_id)),
-                        Permission.delete(Role.user(user_id))
-                    ]
-                 )
-        elif new_status is None and existing_like_doc:
-            # Delete existing like/dislike document
-            context.log(f"Deleting like doc {existing_like_doc['$id']}.")
-            databases.delete_document(
-                database_id=DATABASE_ID,
-                collection_id=LIKES_COLLECTION_ID,
-                document_id=existing_like_doc['$id']
-            )
-        else:
-            context.log("No change needed in 'likes' collection.")
+        # 4. Modify the arrays based on the new_status
+        # Use sets for efficient add/remove and uniqueness
+        liked_set = set(videos_liked)
+        disliked_set = set(videos_disliked)
 
-        # 4. Update counts on the 'video_counts' collection if there were changes
+        if new_status == 'liked':
+            disliked_set.discard(video_id) # Remove from disliked if present
+            liked_set.add(video_id)      # Add to liked (set handles duplicates)
+        elif new_status == 'disliked':
+            liked_set.discard(video_id)    # Remove from liked if present
+            disliked_set.add(video_id)     # Add to disliked
+        else: # new_status is None
+            liked_set.discard(video_id)    # Remove from liked if present
+            disliked_set.discard(video_id) # Remove from disliked if present
+
+        # Convert sets back to lists for storage
+        updated_liked_list = list(liked_set)
+        updated_disliked_list = list(disliked_set)
+        context.log(f"Updated lists ready. Liked: {len(updated_liked_list)}, Disliked: {len(updated_disliked_list)}")
+
+        # 5. Update the user's account document
+        try:
+            databases.update_document(
+                database_id=DATABASE_ID,
+                collection_id=ACCOUNTS_COLLECTION_ID,
+                document_id=user_id,
+                data={
+                    'videosLiked': updated_liked_list,
+                    'videosDisliked': updated_disliked_list
+                }
+            )
+            context.log(f"Successfully updated account document for user {user_id}")
+        except AppwriteException as e:
+            context.error(f"Failed to update account document for user {user_id}: {e}")
+            # If updating the arrays fails, we should probably stop and report error
+            raise Exception(f"Failed to save updated like/dislike status: {e.message}")
+
+        # 6. Update counts on the 'video_counts' collection (same logic as before)
         if like_change != 0 or dislike_change != 0:
             context.log(f"Updating counts in 'video_counts' for video {video_id}...")
             current_likes = 0
             current_dislikes = 0
             counts_doc_exists = False
-
             try:
-                # Try to get the existing counts document using videoId as documentId
                 counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
                 current_likes = counts_doc.get('likeCount', 0)
                 current_dislikes = counts_doc.get('dislikeCount', 0)
@@ -229,64 +204,44 @@ def main(context):
                 context.log(f"Found counts document. Current counts: Likes={current_likes}, Dislikes={current_dislikes}")
             except AppwriteException as e:
                 if e.code == 404:
-                    # Document doesn't exist, counts are 0, we need to create it
                     counts_doc_exists = False
                     context.log(f"Counts document for video {video_id} not found. Will create.")
                 else:
-                    # Other error fetching counts doc, log it but proceed carefully
                     context.error(f"Error fetching counts document for {video_id}: {e}")
-                    # Decide if we should stop count update or proceed assuming 0
-                    # For robustness, let's try to proceed assuming counts were 0.
+                    # Proceed assuming 0 counts
 
-            # Calculate new counts
             new_like_count = max(0, current_likes + like_change)
             new_dislike_count = max(0, current_dislikes + dislike_change)
 
-            # Update or Create the counts document
             try:
                 if counts_doc_exists:
-                    # Update existing document
                     databases.update_document(
-                        database_id=DATABASE_ID,
-                        collection_id=VIDEO_COUNTS_COLLECTION_ID,
-                        document_id=video_id, # Use videoId as document ID
-                        data={
-                            'likeCount': new_like_count,
-                            'dislikeCount': new_dislike_count
-                        }
+                        database_id=DATABASE_ID, collection_id=VIDEO_COUNTS_COLLECTION_ID, document_id=video_id,
+                        data={'likeCount': new_like_count, 'dislikeCount': new_dislike_count}
                     )
                     context.log(f"Updated counts for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
                 else:
-                    # Create new document
                     databases.create_document(
-                        database_id=DATABASE_ID,
-                        collection_id=VIDEO_COUNTS_COLLECTION_ID,
-                        document_id=video_id, # Use videoId as document ID
-                        data={
-                            'likeCount': new_like_count,
-                            'dislikeCount': new_dislike_count
-                        },
-                        # Grant read access to anyone
-                        permissions=[Permission.read(Role.any())]
+                        database_id=DATABASE_ID, collection_id=VIDEO_COUNTS_COLLECTION_ID, document_id=video_id,
+                        data={'likeCount': new_like_count, 'dislikeCount': new_dislike_count},
+                        permissions=[Permission.read(Role.any())] # Allow anyone to read counts
                     )
                     context.log(f"Created counts document for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
             except AppwriteException as e:
-                # Log error but continue - like/dislike itself succeeded
-                context.error(f"Failed to update/create counts document for {video_id}: {e}")
+                context.error(f"Failed to update/create counts document for {video_id}: {e}") # Log error but don't fail the whole request
         else:
             context.log("No count changes required.")
 
         # === End Core Logic ===
 
-        # 5. Map status to integer and return success response
-        if new_status == 'liked':
-            integer_status = 1
-        elif new_status == 'disliked':
-            integer_status = -1
-        else: # new_status is None
-            integer_status = 0
+        # 7. Determine final integer status based on updated lists and return success response
+        final_integer_status = 0
+        if video_id in updated_liked_list:
+            final_integer_status = 1
+        elif video_id in updated_disliked_list:
+            final_integer_status = -1
 
-        success_payload = { "success": "true", "newStatus": integer_status } # Use string "true" and integer status
+        success_payload = { "success": "true", "newStatus": final_integer_status }
         context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
         context.log("--- Likes Manager Invocation End (Success) ---")
         return context.res.json(success_payload) # Return the configured response

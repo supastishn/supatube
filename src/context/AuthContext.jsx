@@ -23,11 +23,16 @@ export const AuthProvider = ({ children }) => {
         appwriteConfig.accountsCollectionId,
         userId
       );
-      return { bio: doc.bio, profileImageUrl: doc.profileImageUrl };
+      return {
+        bio: doc.bio,
+        profileImageUrl: doc.profileImageUrl,
+        videosLiked: doc.videosLiked || [], // Add this, default to empty array
+        videosDisliked: doc.videosDisliked || [] // Add this, default to empty array
+      };
     } catch (error) {
       // Handle 404 Not Found specifically - means no profile doc exists yet
       if (error.code === 404) {
-        return { bio: '', profileImageUrl: null }; // Return default/empty values
+        return { bio: '', profileImageUrl: null, videosLiked: [], videosDisliked: [] }; // Add defaults
       }
       console.error("Failed to fetch account details:", error);
       // Return defaults for other errors
@@ -76,7 +81,9 @@ export const AuthProvider = ({ children }) => {
             {
               bio: '', // Initialize bio as empty
               profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
-              name: name // Store the provided name
+              name: name, // Store the provided name
+              videosLiked: [], // Initialize empty array
+              videosDisliked: [] // Initialize empty array
             },
             [
               Permission.read(Role.user(userId)), // User can read their own doc

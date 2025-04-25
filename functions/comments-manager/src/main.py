@@ -80,20 +80,28 @@ def main(context):
             else:
                 context.log(f"Warning: Could not fetch account details for {user_id}: {e}")
 
-        # 2. Fetch existing comments JSON
+        # 2. Fetch/Initialize Video Counts Document (includes comments)
         comments_list = []
+        current_comment_count = 0
+        current_like_count = 0      # Needed for create document
+        current_dislike_count = 0   # Needed for create document
         create_counts_doc = False
-        current_counts_doc = None
+        counts_doc = None
         try:
             context.log(f"Fetching video_counts document for video {video_id}...")
-            current_counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
-            comments_json_string = current_counts_doc.get('commentsJson') or '[]'
+            counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
+            comments_json_string = counts_doc.get('commentsJson') or '[]'
+            current_comment_count = counts_doc.get('commentCount', 0)
+            # Preserve existing like/dislike counts when updating
+            current_like_count = counts_doc.get('likeCount', 0)
+            current_dislike_count = counts_doc.get('dislikeCount', 0)
+
             try:
                 comments_list = json.loads(comments_json_string)
                 if not isinstance(comments_list, list):
                     context.log("Warning: commentsJson was not a list, resetting to empty.")
                     comments_list = []
-                context.log(f"Parsed {len(comments_list)} existing comments.")
+                context.log(f"Parsed {len(comments_list)} existing comments. Current count: {current_comment_count}")
             except json.JSONDecodeError:
                 context.log("Warning: Failed to parse commentsJson, resetting to empty.")
                 comments_list = []
@@ -102,10 +110,14 @@ def main(context):
                 context.log(f"No video_counts document found for {video_id}. Will create.")
                 create_counts_doc = True
                 comments_list = []
+                current_comment_count = 0
+                current_like_count = 0 # Initialize counts for creation
+                current_dislike_count = 0
             else:
-                raise Exception(f"Error fetching video counts doc: {e.message}") # Rethrow other DB errors
+                # Rethrow other DB errors as we can't proceed
+                raise Exception(f"Error fetching video counts doc: {e.message}")
 
-        # 3. Create New Comment Object
+        # 3. Create New Comment Object (Same as before)
         comment_id = str(uuid.uuid4())
         timestamp_iso = datetime.now(timezone.utc).isoformat()
         new_comment = {
@@ -119,7 +131,7 @@ def main(context):
         }
         context.log(f"Created new comment object with ID: {comment_id}")
 
-        # 4. Add Comment/Reply to the list
+        # 4. Add Comment/Reply to the list (Same as before)
         reply_added = False
         if parent_comment_id:
             context.log(f"Attempting to add reply to parent: {parent_comment_id}")
@@ -133,35 +145,43 @@ def main(context):
             comments_list.insert(0, new_comment) # Insert new top-level comments at the beginning
             context.log("Added new top-level comment.")
 
-        # 5. Serialize and Update/Create Document
+        # 5. Calculate New Comment Count and Serialize JSON
+        new_comment_count = current_comment_count + 1 # Increment count
         updated_comments_json = json.dumps(comments_list)
 
-        # Optional: Check size before saving
-        # if len(updated_comments_json.encode('utf-8')) > MAX_JSON_SIZE_BYTES:
-        #     raise Exception("Cannot add comment: Maximum comment data size exceeded for this video.")
+        # Optional: Add JSON size check here if needed
 
-        update_data = { "commentsJson": updated_comments_json }
+        # 6. Prepare Data and Update/Create Document
+        update_data = {
+            "commentsJson": updated_comments_json,
+            "commentCount": new_comment_count,
+            # Preserve existing like/dislike counts
+            "likeCount": current_like_count,
+            "dislikeCount": current_dislike_count
+        }
 
         if create_counts_doc:
             context.log(f"Creating video_counts document for {video_id}...")
-            # If creating, ensure like/dislike counts are also initialized
-            update_data['likeCount'] = 0
-            update_data['dislikeCount'] = 0
             databases.create_document(
                 database_id=DATABASE_ID,
                 collection_id=VIDEO_COUNTS_COLLECTION_ID,
                 document_id=video_id,
-                data=update_data,
-                permissions=[Permission.read(Role.any())] # Read counts/comments publicly
+                data=update_data, # includes all counts initialized
+                permissions=[Permission.read(Role.any())]
             )
             context.log("Created video_counts document.")
         else:
             context.log(f"Updating video_counts document for {video_id}...")
+            # Only send fields being updated to avoid overwriting potentially concurrent like/dislike updates
+            minimal_update_data = {
+                 "commentsJson": updated_comments_json,
+                 "commentCount": new_comment_count
+            }
             databases.update_document(
                 database_id=DATABASE_ID,
                 collection_id=VIDEO_COUNTS_COLLECTION_ID,
                 document_id=video_id,
-                data=update_data
+                data=minimal_update_data
             )
             context.log("Updated video_counts document.")
 

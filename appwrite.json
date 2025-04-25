@@ -258,14 +258,6 @@
                     "max": 999999999,
                     "default": 0
                 },
-                {
-                    "key": "commentsJson",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 10000000,
-                    "default": "[]"
-                }
             ],
             "indexes": [
                 {
@@ -340,6 +332,23 @@
                     "array": true,
                     "size": 999999,
                     "default": null
+                },
+                {
+                    "key": "commentsJson",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 10000000,
+                    "default": "[]"
+                },
+                {
+                    "key": "commentCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
                 }
             ],
             "indexes": []

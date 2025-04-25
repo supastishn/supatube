@@ -398,11 +398,11 @@ const VideoDetail = () => {
     loadComments();
   }, [videoId]); // Re-run when videoId changes
 
-  // --- New effect to fetch like/dislike counts ---
+  // --- Effect to fetch video counts (likes, dislikes, comments) ---
   useEffect(() => {
     if (!videoId) return; // Don't run if videoId isn't set
 
-    const fetchCounts = async () => {
+    const fetchAllCounts = async () => {
       setLoadingCounts(true); // Start count-specific loading
       try {
         // Use videoId as the document ID for video_counts
@@ -413,24 +413,28 @@ const VideoDetail = () => {
         );
         setLikeCount(countsDoc.likeCount || 0);
         setDislikeCount(countsDoc.dislikeCount || 0);
+        setVideoCommentCount(countsDoc.commentCount || 0); // Ensure this line is present
+        console.log(`[Counts Effect] Fetched counts for ${videoId}:`, countsDoc);
       } catch (err) {
         if (err.code === 404) {
-          // Video has no counts document yet (no likes/dislikes)
+          // Video has no counts document yet (no likes/dislikes/comments)
           setLikeCount(0);
           setDislikeCount(0);
-          console.log(`Counts document not found for video ${videoId}, defaulting to 0.`);
+          setVideoCommentCount(0); // Ensure this is set to 0 on 404
+          console.log(`[Counts Effect] Counts doc 404 for ${videoId}, defaulting to 0.`);
         } else {
-          console.error("Failed to fetch video counts:", err);
+          console.error("[Counts Effect] Failed to fetch video counts:", err);
           // Optionally set an error state specific to counts
           setLikeCount(0); // Default to 0 on error too
           setDislikeCount(0);
+          setVideoCommentCount(0); // Ensure this is set to 0 on error
         }
       } finally {
         setLoadingCounts(false); // Stop count-specific loading
       }
     };
 
-    fetchCounts();
+    fetchAllCounts();
   }, [videoId]); // Re-run when videoId changes
 
   // --- Effect to derive initial like status from user context ---
@@ -508,6 +512,7 @@ const VideoDetail = () => {
       setComments(prevComments => [newComment, ...prevComments]);
       setNewCommentText(''); // Clear input field
       setVideoCommentCount(prev => prev + 1); // Increment local count
+      // Note: The server also updates the commentCount in the database
     } catch (error) {
       console.error("Failed to post comment:", error);
       setCommentPostError(error.message || "Failed to post comment.");
@@ -711,8 +716,8 @@ const VideoDetail = () => {
         <div className="comments-section">
           {/* Comment Count Header */}
           <h3 className="comments-count">
-            {loadingComments ? '...' : `${comments.length}`} Comments
-            {/* Or use videoCommentCount: {loadingCounts ? '...' : videoCommentCount} Comments */}
+             {/* Use videoCommentCount state, show '...' while counts are loading */}
+             {loadingCounts ? '...' : `${videoCommentCount}`} Comments
           </h3>
 
           {/* Comment Input Form */}

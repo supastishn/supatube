@@ -46,10 +46,14 @@ const Account = () => {
 
       if (bioChanged || imageUrlChanged || nameChanged || nameUpdated) {
         // Prepare the data object with all current profile fields
+        // Ensure all REQUIRED fields are included, fetching from user context or defaulting
         const accountDataPayload = {
           name: name, // Always include the current name state
           bio: bio,
-          profileImageUrl: profileImageUrl
+          profileImageUrl: profileImageUrl,
+          videosLiked: user?.videosLiked || [],      // Include required array
+          videosDisliked: user?.videosDisliked || [], // Include required array
+          subscribingTo: user?.subscribingTo || []    // Include required array
         };
         
         try {

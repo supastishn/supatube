@@ -203,32 +203,6 @@ const VideoDetail = () => {
     }
   }, [currentUser, video?.channel?.creatorUserId, videoId, isSubscribed, subscriberCount, loadingSubscription, navigate]);
 
-  // Video deletion handler
-  const handleDeleteVideo = async () => {
-    if (!video || !video.id || isDeleting) return;
-
-    const confirmDelete = window.confirm("Are you sure you want to delete this video? This cannot be undone.");
-    if (!confirmDelete) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setDeleteError('');
-
-    try {
-      const result = await deleteVideo(video.id);
-      console.log('Video deleted successfully:', result.message);
-      // On success, navigate away (e.g., to home)
-      alert('Video deleted successfully!'); // Simple feedback
-      navigate('/'); // Redirect to home page
-    } catch (error) {
-      console.error('Failed to delete video:', error);
-      setDeleteError(error.message || 'Could not delete the video. Please try again.');
-      setIsDeleting(false); // Stop loading on error
-    }
-    // No finally needed as we navigate away on success
-  };
-
   // Debug log to verify the function exists before rendering
   console.log('Is handleLikeDislike defined before render?', typeof handleLikeDislike);
 

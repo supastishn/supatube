@@ -253,13 +253,18 @@
         },
         {
             "$id": "video-deletion-manager",
-            "execute": [],
+            "execute": [
+                "users"
+            ],
             "name": "video-deletion-manager",
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [
-                "users.read"
+                "documents.read",
+                "documents.write",
+                "files.read",
+                "files.write"
             ],
             "events": [],
             "schedule": "",

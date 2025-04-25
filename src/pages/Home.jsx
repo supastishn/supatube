@@ -1,13 +1,70 @@
 import { useState, useEffect, useCallback } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component is in ../components
-import { databases, storage, avatars, account } from '../lib/appwriteConfig';
-import { Query } from 'appwrite'; // Import Query directly from appwrite package
-import { appwriteConfig } from '../lib/appwriteConfig';
+import { databases, storage, avatars, account, appwriteConfig } from '../lib/appwriteConfig';
+import { Query, Permission, Role } from 'appwrite'; // Import Query, Permission, Role
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user: currentUser, loading: authLoading } = useAuth(); // Get user and auth loading state
+
+  // Effect to ensure account document exists for logged-in user
+  useEffect(() => {
+    const ensureAccountDocumentExists = async () => {
+      // Only run if auth check is complete and user is logged in
+      if (authLoading || !currentUser) {
+        return;
+      }
+
+      try {
+        // Try to get the document
+        await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.accountsCollectionId,
+          currentUser.$id
+        );
+        // console.log(`[Home] Account document found for user ${currentUser.$id}.`); // Optional: Log success
+      } catch (err) {
+        // If document not found (404), create it
+        if (err.code === 404) {
+          console.log(`[Home] Account document not found for user ${currentUser.$id}. Creating...`);
+          try {
+            const defaultAccountData = {
+              name: currentUser.name || 'User', // Use name from auth, fallback to 'User'
+              bio: '',                         // Default empty bio
+              profileImageUrl: null,           // Default null image URL
+              videosLiked: [],                 // Required empty array
+              videosDisliked: [],              // Required empty array
+              subscribingTo: []                // Required empty array
+            };
+            await databases.createDocument(
+              appwriteConfig.databaseId,
+              appwriteConfig.accountsCollectionId,
+              currentUser.$id, // Use user's ID as document ID
+              defaultAccountData,
+              [
+                Permission.read(Role.user(currentUser.$id)),   // User can read their own doc
+                Permission.update(Role.user(currentUser.$id)), // User can update their own doc
+                Permission.read(Role.any())                     // Profiles are public
+              ]
+            );
+            console.log(`[Home] Successfully created account document for user ${currentUser.$id}.`);
+            // Optionally, trigger a context update if needed, though subsequent fetches should get it
+            // await updateUserProfile();
+          } catch (createError) {
+            console.error(`[Home] Failed to create account document for ${currentUser.$id}:`, createError);
+          }
+        } else {
+          // Log other errors during getDocument
+          console.error(`[Home] Error checking account document for ${currentUser.$id}:`, err);
+        }
+      }
+    };
+
+    ensureAccountDocumentExists();
+  }, [currentUser, authLoading]); // Dependencies: Run when user or loading state changes
 
   useEffect(() => {
     const fetchVideos = async () => {

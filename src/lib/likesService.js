@@ -2,7 +2,7 @@ import { functions } from './appwriteConfig';
 import { appwriteConfig } from './appwriteConfig';
 
 // IMPORTANT: Ensure this matches the ID in your appwrite.json and Appwrite console
-const LIKES_FUNCTION_ID = 'test'; // Route to the 'test' function for now
+const LIKES_FUNCTION_ID = 'likes-manager'; // Revert to the actual likes manager function
 
 /**
  * Calls the backend function to toggle like/dislike status for a video.
@@ -42,12 +42,12 @@ export const toggleLikeDislike = async (videoId, action) => {
     // Attempt to parse the JSON response body from the function
     let responseData = {};
     try {
-        responseData = JSON.parse(result.response);
+        responseData = JSON.parse(result.responseBody);
         console.log(`[likesService] Parsed function response:`, responseData);
         console.log(`[likesService] Parsed responseData.success: ${responseData.success} (Type: ${typeof responseData.success})`);
         console.log(`[likesService] Parsed responseData.newStatus: ${responseData.newStatus} (Type: ${typeof responseData.newStatus})`);
     } catch (parseError) {
-        console.error("[likesService] Could not parse JSON response from likes function:", result.response, parseError);
+        console.error("[likesService] Could not parse JSON response from likes function:", result.responseBody, parseError);
         // Treat non-JSON response as an error from the function's perspective
         throw new Error(`Failed to ${action} video. Unexpected response from function.`);
     }

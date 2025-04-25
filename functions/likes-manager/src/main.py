@@ -42,7 +42,7 @@ def main(context):
             VIDEO_INTERACTIONS_COLLECTION_ID,
             [Query.limit(100)]
         )
-        interactions = interaction_response.documents
+        interactions = interaction_response['documents']
         total_fetched = len(interactions)
         context.log(f"Fetched {total_fetched} interactions to process.")
 

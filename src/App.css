@@ -155,6 +155,21 @@
     background-color: var(--dark-light);
 }
 
+.subscribe-btn.subscribed {
+  background-color: var(--light-gray);
+  color: var(--text-secondary);
+}
+
+.subscribe-btn.subscribed:hover {
+    background-color: #e0e0e0; /* Slightly darker grey on hover */
+}
+
+.subscription-error-message {
+  color: var(--primary, red);
+  font-size: 13px;
+  margin-left: 10px; /* Adjust positioning */
+}
+
 .video-description {
     font-size: 14px;
     line-height: 1.6;

@@ -4,7 +4,8 @@ import VideoCard from '../components/VideoCard'; // Assuming VideoCard component
 import { formatDistanceToNowStrict, parseISO } from 'date-fns'; // For time ago formatting
 import { Fragment } from 'react'; // Import Fragment if needed for structure
 import { useAuth } from '../context/AuthContext'; // Import useAuth
-import { toggleLikeDislike } from '../lib/likesService'; // Import the new service
+import { toggleLikeDislike } from '../lib/likesService'; // Import like service
+import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
 
 // Appwrite Imports
 import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
@@ -53,7 +54,13 @@ const VideoDetail = () => {
   const [likeError, setLikeError] = useState(''); // Specific error for like/dislike actions
   const [loadingCounts, setLoadingCounts] = useState(true); // Separate loading for counts
   
-  // Handle like/dislike button clicks
+  // --- Add subscription state variables ---
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState('');
+  const [loadingSubCount, setLoadingSubCount] = useState(true);
+  
   // Handle like/dislike button clicks
   const handleLikeDislike = useCallback(async (action) => {
     // If not logged in, redirect to sign in
@@ -117,6 +124,44 @@ const VideoDetail = () => {
       setIsLiking(false); // Re-enable buttons
     }
   }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, setUserLikeStatus, setLikeCount, setDislikeCount, setLikeError, setIsLiking]);
+
+  // Subscribe/unsubscribe toggle handler
+  const handleSubscribeToggle = useCallback(async () => {
+    if (!currentUser) {
+      navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
+      return;
+    }
+    if (!video?.channel?.creatorUserId || loadingSubscription) {
+      return; // No creator ID or already processing
+    }
+
+    const creatorId = video.channel.creatorUserId;
+    const action = isSubscribed ? 'unsubscribe' : 'subscribe';
+    const previousSubState = isSubscribed;
+    const previousSubCount = subscriberCount;
+
+    setLoadingSubscription(true);
+    setSubscriptionError('');
+
+    // Optimistic Update
+    setIsSubscribed(!previousSubState);
+    setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
+
+    try {
+      const result = await toggleSubscription(creatorId, action);
+      // Optional: Update state definitively if needed, though optimistic is usually fine
+      // setIsSubscribed(result.isSubscribed);
+      console.log('Subscription toggle success:', result);
+    } catch (error) {
+      console.error('Subscription toggle failed:', error);
+      // Revert optimistic updates
+      setIsSubscribed(previousSubState);
+      setSubscriberCount(previousSubCount);
+      setSubscriptionError(error.message || 'Failed to update subscription.');
+    } finally {
+      setLoadingSubscription(false);
+    }
+  }, [currentUser, video?.channel?.creatorUserId, videoId, isSubscribed, subscriberCount, loadingSubscription, navigate]);
 
   // Debug log to verify the function exists before rendering
   console.log('Is handleLikeDislike defined before render?', typeof handleLikeDislike);
@@ -377,6 +422,47 @@ const VideoDetail = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, videoId]); // Rerun when user data or videoId changes
+  
+  // --- Effect to fetch subscriber count ---
+  useEffect(() => {
+    if (!video?.channel?.creatorUserId) return; // Don't run if creator ID isn't available
+
+    const creatorId = video.channel.creatorUserId;
+    const fetchSubCount = async () => {
+      setLoadingSubCount(true);
+      try {
+        const statsDoc = await databases.getDocument(
+          appwriteConfig.databaseId,
+          appwriteConfig.channelStatsCollectionId, // Use the correct ID
+          creatorId
+        );
+        setSubscriberCount(statsDoc.subscriberCount || 0);
+      } catch (err) {
+        if (err.code === 404) {
+          setSubscriberCount(0); // No stats doc means 0 subs
+        } else {
+          console.error("Failed to fetch subscriber count:", err);
+          setSubscriberCount(0); // Default to 0 on error
+        }
+      } finally {
+        setLoadingSubCount(false);
+      }
+    };
+
+    fetchSubCount();
+  }, [video?.channel?.creatorUserId]); // Re-run when creator ID changes
+
+  // --- Effect to derive initial subscription status from user context ---
+  useEffect(() => {
+    if (currentUser && video?.channel?.creatorUserId) {
+      const creatorId = video.channel.creatorUserId;
+      const currentlySubscribed = (currentUser.subscribingTo || []).includes(creatorId);
+      setIsSubscribed(currentlySubscribed);
+      console.log(`[VideoDetail Sub Effect] Initial subscription status for ${creatorId}: ${currentlySubscribed}`);
+    } else {
+      setIsSubscribed(false); // Not logged in or no creator ID
+    }
+  }, [currentUser, video?.channel?.creatorUserId]); // Re-run when user or creator ID changes
 
   // --- Render States ---
 
@@ -524,10 +610,21 @@ const VideoDetail = () => {
                     <Link to={`/profile/${video.channel.creatorUserId || 'unknown-user'}`} className="channel-name-link">
                         {video.channel.name}
                     </Link>
-                    <p className="channel-subscribers">{formatViews(video.channel.subscriberCount)} subscribers</p>
+                    <p className="channel-subscribers">
+                        {loadingSubCount ? '...' : formatViews(subscriberCount)} subscribers
+                    </p>
                 </div>
-                {/* TODO: Add dynamic Subscribe button state */}
-                <button className="subscribe-btn">Subscribe</button>
+                {/* Dynamic Subscribe Button */}
+                {video.channel.creatorUserId && currentUser?.$id !== video.channel.creatorUserId && (
+                  <button
+                    className={`subscribe-btn ${isSubscribed ? 'subscribed' : ''}`}
+                    onClick={handleSubscribeToggle}
+                    disabled={loadingSubscription || loadingSubCount}
+                  >
+                    {loadingSubscription ? '...' : (isSubscribed ? 'Subscribed' : 'Subscribe')}
+                  </button>
+                )}
+                {subscriptionError && <p className="subscription-error-message">{subscriptionError}</p>}
             </div>
 
             {/* Video Description */}

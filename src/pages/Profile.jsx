@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { storage, databases, appwriteConfig } from '../lib/appwriteConfig';
 import { Query } from 'appwrite'; // Import Query directly from appwrite package
+import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
 import VideoCard from '../components/VideoCard'; // Import VideoCard
 import { useAuth } from '../context/AuthContext'; // Optional: To check if it's the current user's profile
 
@@ -14,6 +15,13 @@ const Profile = () => {
   const [userVideos, setUserVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Add subscription state variables
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState('');
+  const [loadingSubCount, setLoadingSubCount] = useState(true);
 
   const isOwnProfile = currentUser && currentUser.$id === userId; // Check if it's the logged-in user's profile
 
@@ -64,6 +72,25 @@ const Profile = () => {
         
         setUserVideos(userOwnedVideos);
 
+        // Fetch subscriber count
+        try {
+          const statsDoc = await databases.getDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.channelStatsCollectionId,
+            userId
+          );
+          setSubscriberCount(statsDoc.subscriberCount || 0);
+        } catch (statsErr) {
+          if (statsErr.code === 404) {
+            setSubscriberCount(0); // No stats doc means 0 subscribers
+          } else {
+            console.error("Error fetching subscriber count:", statsErr);
+            setSubscriberCount(0); // Default to 0 on any error
+          }
+        } finally {
+          setLoadingSubCount(false);
+        }
+
       } catch (err) {
         console.error("Error fetching profile data:", err);
         // Handle user not found (Appwrite often throws 404 for getDocument)
@@ -79,6 +106,50 @@ const Profile = () => {
 
     fetchProfileData();
   }, [userId]); // Re-run effect if userId changes
+
+  // Effect to check if current user is subscribed to this profile
+  useEffect(() => {
+    if (currentUser && userId && !isOwnProfile) {
+      const currentlySubscribed = (currentUser.subscribingTo || []).includes(userId);
+      setIsSubscribed(currentlySubscribed);
+      console.log(`[Profile] Initial subscription status for ${userId}: ${currentlySubscribed}`);
+    } else {
+      setIsSubscribed(false);
+    }
+  }, [currentUser, userId, isOwnProfile]); // Re-run when user or profile ID changes
+
+  // Handle subscribe/unsubscribe
+  const handleSubscribeToggle = async () => {
+    if (!currentUser) {
+      navigate('/sign-in', { state: { from: { pathname: `/profile/${userId}` } } });
+      return;
+    }
+    
+    if (loadingSubscription) return;
+
+    const action = isSubscribed ? 'unsubscribe' : 'subscribe';
+    const previousSubState = isSubscribed;
+    const previousSubCount = subscriberCount;
+
+    setLoadingSubscription(true);
+    setSubscriptionError('');
+
+    // Optimistic Update
+    setIsSubscribed(!previousSubState);
+    setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
+
+    try {
+      await toggleSubscription(userId, action);
+    } catch (error) {
+      console.error('Subscription toggle failed:', error);
+      // Revert optimistic updates
+      setIsSubscribed(previousSubState);
+      setSubscriberCount(previousSubCount);
+      setSubscriptionError(error.message || 'Failed to update subscription.');
+    } finally {
+      setLoadingSubscription(false);
+    }
+  };
 
   if (loading) {
     return <div className="loading-container">Loading profile...</div>; // Use shared loading style
@@ -102,11 +173,27 @@ const Profile = () => {
           alt={`${userData.name || 'User'}'s avatar`}
           className="profile-avatar" // Add styling for this class
         />
-        <h1>{userData.name || 'Unnamed User'}</h1>
-        {userData.bio && <p className="profile-bio">{userData.bio}</p>}
-        {/* You might want to format the join date from userData.$createdAt if needed */}
-        {/* Example: <p>Joined: {format(parseISO(userData.$createdAt), 'MMMM d, yyyy')}</p> */}
-        {isOwnProfile && <button className="btn-primary" onClick={() => navigate('/account')}>Edit Profile</button>}
+        <div className="profile-header-info">
+          <h1>{userData.name || 'Unnamed User'}</h1>
+          <p className="subscriber-count">{loadingSubCount ? '...' : `${formatViews(subscriberCount)} subscribers`}</p>
+          {userData.bio && <p className="profile-bio">{userData.bio}</p>}
+
+          {/* Conditional button rendering */}
+          <div className="profile-actions">
+            {isOwnProfile ? (
+              <button className="btn-primary" onClick={() => navigate('/account')}>Edit Profile</button>
+            ) : currentUser && (
+              <button 
+                className={`subscribe-btn ${isSubscribed ? 'subscribed' : ''}`}
+                onClick={handleSubscribeToggle}
+                disabled={loadingSubscription}
+              >
+                {loadingSubscription ? '...' : (isSubscribed ? 'Subscribed' : 'Subscribe')}
+              </button>
+            )}
+            {subscriptionError && <p className="subscription-error-message">{subscriptionError}</p>}
+          </div>
+        </div>
       </div>
 
       <div className="user-videos">
@@ -176,10 +263,29 @@ const Profile = () => {
              margin-bottom: 16px;
              font-size: 18px;
          }
+         .profile-header-info {
+             flex: 1;
+         }
+         .subscriber-count {
+             color: var(--text-secondary);
+             font-size: 14px;
+             margin-bottom: 10px;
+         }
          .profile-bio {
              color: var(--text-secondary);
              margin-bottom: 20px;
              white-space: pre-wrap; /* Preserve line breaks in bio */
+         }
+         .profile-actions {
+             display: flex;
+             align-items: center;
+             gap: 10px;
+             margin-top: 15px;
+         }
+         .profile-details {
+             display: flex;
+             gap: 20px;
+             align-items: flex-start;
          }
       `}</style>
     </div>

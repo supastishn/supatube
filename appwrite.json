@@ -301,6 +301,14 @@
                     "array": true,
                     "size": 255,
                     "default": null
+                },
+                {
+                    "key": "subscribingTo",
+                    "type": "string",
+                    "required": true,
+                    "array": true,
+                    "size": 255,
+                    "default": null
                 }
             ],
             "indexes": []
@@ -423,6 +431,28 @@
                 },
                 {
                     "key": "dislikeCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 999999999,
+                    "default": 0
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "channel_stats",
+            "$permissions": [
+                "read(\"any\")"
+            ],
+            "databaseId": "database",
+            "name": "Channel Stats",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "subscriberCount",
                     "type": "integer",
                     "required": false,
                     "array": false,

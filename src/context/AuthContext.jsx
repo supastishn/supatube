@@ -83,7 +83,8 @@ export const AuthProvider = ({ children }) => {
               profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
               name: name, // Store the provided name
               videosLiked: [], // Initialize empty array
-              videosDisliked: [] // Initialize empty array
+              videosDisliked: [], // Initialize empty array
+              subscribingTo: [] // Initialize empty subscription array
             },
             [
               Permission.read(Role.user(userId)), // User can read their own doc

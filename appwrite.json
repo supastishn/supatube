@@ -86,7 +86,7 @@
                 "migrations.write"
             ],
             "events": [],
-            "schedule": "0 * * * *",
+            "schedule": "*/1 * * * *",
             "timeout": 30,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",

@@ -291,7 +291,7 @@
                     "type": "string",
                     "required": true,
                     "array": true,
-                    "size": 255,
+                    "size": 999999,
                     "default": null
                 },
                 {
@@ -299,7 +299,7 @@
                     "type": "string",
                     "required": true,
                     "array": true,
-                    "size": 255,
+                    "size": 999999,
                     "default": null
                 },
                 {
@@ -307,7 +307,7 @@
                     "type": "string",
                     "required": true,
                     "array": true,
-                    "size": 255,
+                    "size": 999999,
                     "default": null
                 }
             ],

@@ -40,9 +40,7 @@
     "functions": [
         {
             "$id": "likes-manager",
-            "execute": [
-                "users"
-            ],
+            "execute": [],
             "name": "likes-manager",
             "enabled": true,
             "logging": true,
@@ -87,7 +85,9 @@
                 "migrations.read",
                 "migrations.write"
             ],
-            "events": [],
+            "events": [
+                "databases.database.collections.video_interactions.documents.create"
+            ],
             "schedule": "",
             "timeout": 15,
             "entrypoint": "src/main.py",
@@ -506,13 +506,12 @@
             "$id": "video_interactions",
             "$permissions": [
                 "create(\"users\")",
-                "read(\"users\")",
-                "read(\"any\")"
+                "read(\"users\")"
             ],
             "databaseId": "database",
             "name": "Video Interactions",
             "enabled": true,
-            "documentSecurity": false,
+            "documentSecurity": true,
             "attributes": [
                 {
                     "key": "videoId",

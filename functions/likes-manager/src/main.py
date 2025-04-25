@@ -1,120 +1,94 @@
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.exception import AppwriteException
-from appwrite.query import Query
 from appwrite.permission import Permission
 from appwrite.role import Role
 import os
 import json
 
+# Configuration Constants
 DATABASE_ID = "database"
-LIKES_COLLECTION_ID =  "likes"
-VIDEO_COUNTS_COLLECTION_ID = "video_counts"
 ACCOUNTS_COLLECTION_ID = "accounts"
+VIDEO_COUNTS_COLLECTION_ID = "video_counts"
+# VIDEO_INTERACTIONS_COLLECTION_ID = "video_interactions" # Not directly needed in function logic
 
-# This is executed when the function is triggered
 def main(context):
-    # --- START DETAILED REQUEST LOGGING ---
-    context.log("--- Likes Manager Invocation Start ---")
-    context.log(f"Request Method: {context.req.method}")
-    context.log(f"Request Scheme: {context.req.scheme}")
-    context.log(f"Request Host: {context.req.host}")
-    context.log(f"Request Port: {context.req.port}")
-    context.log(f"Request Path: {context.req.path}")
-    context.log(f"Request Query String: {context.req.query_string}")
-    # Log headers, excluding potentially sensitive ones
-    log_headers = {k.lower(): v for k, v in context.req.headers.items() if 'key' not in k.lower() and 'secret' not in k.lower() and 'auth' not in k.lower()}
-    context.log(f"Request Headers: {json.dumps(log_headers)}")
-    # Log the raw body received
-    context.log(f"Request Body Raw: '{context.req.body_raw}'")
-    # --- END DETAILED REQUEST LOGGING ---
-    # Ensure environment variables are set
+    context.log("--- Likes Manager (Event Triggered) Invocation Start ---")
+
+    # --- Environment Variable Check ---
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
     project_id = os.environ.get("APPWRITE_FUNCTION_PROJECT_ID")
-    api_key = context.req.headers.get('x-appwrite-key') # Use API key environment variable
+    # API Key is crucial for event-triggered functions needing broad access
+    api_key = os.environ.get("APPWRITE_FUNCTION_API_KEY")
 
     if not all([api_endpoint, project_id, api_key]):
-        error_message = "Missing required environment variables (ENDPOINT, PROJECT_ID, API_KEY)."
-        context.error(error_message)
-        response_payload = {"success": "false", "message": "Function configuration error."}
-        response_status = 500
-        context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
-        context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status) # Return the configured response
+        message = "Function configuration error: Missing endpoint, project ID, or API key."
+        context.error(message)
+        # Event functions usually just log errors or return non-2xx status
+        # For simplicity, returning text which might appear in function logs.
+        return context.res.text(message, 500)
 
-    # Check for User ID (should be present if execute permission is 'users')
-    user_id = context.req.headers.get('x-appwrite-user-id')
-    if not user_id:
-        error_message = "User not authenticated."
-        context.error(error_message)
-        response_payload = {"success": "false", "message": "Authentication required."}
-        response_status = 401
-        context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
-        context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status) # Return the configured response
-    context.log(f"Authenticated User ID: {user_id}")
-
-    # Parse request body
-    payload = None
-    video_id = None
-    action = None
+    # --- Parse Event Payload ---
+    interaction_doc = None
     try:
-        # Use body_raw which should contain the string sent from the client SDK
-        payload = json.loads(context.req.body_raw)
-        # Log the successfully parsed payload
-        context.log(f"Parsed Payload: {payload}")
-        video_id = payload.get('videoId')
-        action = payload.get('action')
+        # The created document data is the event payload
+        interaction_doc = json.loads(context.req.body_raw)
+        context.log(f"Received interaction document payload: {json.dumps(interaction_doc)}")
+    except json.JSONDecodeError as e:
+        context.error(f"Failed to parse event payload (interaction document): {e}. Raw: '{context.req.body_raw}'")
+        return context.res.text("Invalid event payload", 400)
 
-        if not video_id or action not in ['like', 'dislike']:
-            raise ValueError("Missing 'videoId' or invalid 'action' in request body.")
-        # Log the extracted videoId and action
-        context.log(f"Processing Video ID: {video_id}, Action: {action}")
+    # --- Extract Data from Interaction Document ---
+    video_id = interaction_doc.get('videoId')
+    interaction_type = interaction_doc.get('type')
+    doc_permissions = interaction_doc.get('$permissions', [])
+    interaction_doc_id = interaction_doc.get('$id', 'unknown') # For logging
 
-    except Exception as e:
-        # Log the specific error and include the raw body for context
-        error_message = f"Invalid request payload: {e}. Raw body was: '{context.req.body_raw}'"
-        context.error(error_message)
-        response_payload = {"success": "false", "message": f"Invalid request: {e}"}
-        response_status = 400
-        context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
-        context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status) # Return the configured response
+    if not video_id or interaction_type not in ['like', 'dislike']:
+        context.error(f"Missing videoId or invalid type ('{interaction_type}') in interaction doc {interaction_doc_id}.")
+        return context.res.text("Invalid interaction data", 400)
 
-    # Initialize Appwrite Client
+    # --- Identify User ID from Permissions ---
+    user_id = None
+    # Look for update permission, assuming only the creator has it on the interaction doc
+    update_permission_prefix = 'update("user:'
+    for perm in doc_permissions:
+        if perm.startswith(update_permission_prefix):
+            # Extract the user ID between 'user:' and '")'
+            start_index = len(update_permission_prefix)
+            end_index = perm.find('")', start_index)
+            if end_index != -1:
+                 user_id = perm[start_index:end_index]
+                 break # Found the user ID
+
+    if not user_id:
+        context.error(f"Could not determine user ID from permissions on interaction doc {interaction_doc_id}. Permissions: {doc_permissions}")
+        return context.res.text("Could not identify user from interaction document", 500)
+
+    context.log(f"Processing interaction by User ID: {user_id} for Video ID: {video_id}, Type: {interaction_type}")
+
+    # --- Initialize Appwrite Client (using API Key) ---
     client = Client()
-    client.set_endpoint(api_endpoint)
-    client.set_project(project_id)
-    client.set_key(api_key) # Use API Key for privileged access
-
+    client.set_endpoint(api_endpoint).set_project(project_id).set_key(api_key)
     databases = Databases(client)
 
-    like_change = 0
-    dislike_change = 0
-    new_status = None # 'like', 'dislike', or None
-
     try:
-        # === Start Core Logic (v2 - Using accounts collection arrays) ===
-        context.log(f"Fetching account details for user {user_id}...")
+        # --- Core Logic ---
 
         # 1. Get user's account document
-        account_doc = None
-        videos_liked = []
-        videos_disliked = []
         try:
             account_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id)
-            # Ensure arrays exist and are lists, handle None/null from potential older docs or missing attributes
             videos_liked = account_doc.get('videosLiked', []) or []
             videos_disliked = account_doc.get('videosDisliked', []) or []
-            context.log(f"Fetched account doc. Liked: {len(videos_liked)} videos, Disliked: {len(videos_disliked)} videos.")
+            context.log(f"User {user_id}: Likes {len(videos_liked)}, Dislikes {len(videos_disliked)}")
         except AppwriteException as e:
-            if e.code == 404:
-                # This should ideally not happen if user is authenticated via Appwrite & registered
-                context.error(f"CRITICAL: Account document not found for authenticated user {user_id}. Cannot proceed.")
-                raise Exception(f"User account details document missing for user {user_id}.")
-            else:
-                context.error(f"Error fetching account document for user {user_id}: {e}")
-                raise Exception(f"Database error fetching account details: {e.message}")
+             if e.code == 404:
+                context.error(f"CRITICAL: Account document not found for user {user_id} who created interaction {interaction_doc_id}.")
+                # Depending on requirements, might try to create the doc here, but failing is safer for now.
+                return context.res.text(f"Account document missing for user {user_id}", 500)
+             else:
+                context.error(f"Error fetching account doc for {user_id}: {e}")
+                raise # Rethrow other DB errors
 
         # 2. Determine current status based on arrays
         current_status = None
@@ -122,90 +96,81 @@ def main(context):
             current_status = 'liked'
         elif video_id in videos_disliked:
             current_status = 'disliked'
-        context.log(f"Current status for video {video_id}: {current_status}")
+        context.log(f"Video {video_id} current status for user {user_id}: {current_status}")
 
-        # 3. Determine changes based on action and current state
-        like_change = 0         # For video_counts update
-        dislike_change = 0      # For video_counts update
-        new_status = None       # 'liked', 'disliked', or None (final state for account arrays)
+        # 3. Determine changes needed based on the interaction type and current status
+        like_change = 0         # Delta for video_counts likeCount
+        dislike_change = 0      # Delta for video_counts dislikeCount
+        perform_user_update = False # Flag to update user's account doc
 
-        if action == 'like':
-            if current_status == 'liked':       # Toggle like off
-                like_change = -1
-                new_status = None
-            elif current_status == 'disliked':  # Change dislike to like
-                like_change = 1
-                dislike_change = -1
-                new_status = 'liked'
-            else:                               # Add new like
-                like_change = 1
-                new_status = 'liked'
-        else: # action == 'dislike'
-            if current_status == 'disliked':    # Toggle dislike off
-                dislike_change = -1
-                new_status = None
-            elif current_status == 'liked':     # Change like to dislike
-                like_change = -1
-                dislike_change = 1
-                new_status = 'disliked'
-            else:                               # Add new dislike
-                dislike_change = 1
-                new_status = 'disliked'
-        context.log(f"Determined changes: like_change={like_change}, dislike_change={dislike_change}, new_status={new_status}")
-
-        # 4. Modify the arrays based on the new_status
-        # Use sets for efficient add/remove and uniqueness
         liked_set = set(videos_liked)
         disliked_set = set(videos_disliked)
 
-        if new_status == 'liked':
-            disliked_set.discard(video_id) # Remove from disliked if present
-            liked_set.add(video_id)      # Add to liked (set handles duplicates)
-        elif new_status == 'disliked':
-            liked_set.discard(video_id)    # Remove from liked if present
-            disliked_set.add(video_id)     # Add to disliked
-        else: # new_status is None
-            liked_set.discard(video_id)    # Remove from liked if present
-            disliked_set.discard(video_id) # Remove from disliked if present
+        if interaction_type == 'like':
+            if current_status == 'liked':       # User clicked 'like' again - toggle OFF
+                like_change = -1
+                liked_set.discard(video_id)
+                perform_user_update = True
+            elif current_status == 'disliked':  # User clicked 'like' but had disliked - switch to LIKE
+                like_change = 1
+                dislike_change = -1
+                liked_set.add(video_id)
+                disliked_set.discard(video_id)
+                perform_user_update = True
+            else:                               # User clicked 'like' (was neutral) - add LIKE
+                like_change = 1
+                liked_set.add(video_id)
+                perform_user_update = True
+        elif interaction_type == 'dislike':
+            if current_status == 'disliked':    # User clicked 'dislike' again - toggle OFF
+                dislike_change = -1
+                disliked_set.discard(video_id)
+                perform_user_update = True
+            elif current_status == 'liked':     # User clicked 'dislike' but had liked - switch to DISLIKE
+                like_change = -1
+                dislike_change = 1
+                disliked_set.add(video_id)
+                liked_set.discard(video_id)
+                perform_user_update = True
+            else:                               # User clicked 'dislike' (was neutral) - add DISLIKE
+                dislike_change = 1
+                disliked_set.add(video_id)
+                perform_user_update = True
 
-        # Convert sets back to lists for storage
-        updated_liked_list = list(liked_set)
-        updated_disliked_list = list(disliked_set)
-        context.log(f"Updated lists ready. Liked: {len(updated_liked_list)}, Disliked: {len(updated_disliked_list)}")
+        context.log(f"Changes calculated: like_change={like_change}, dislike_change={dislike_change}, perform_user_update={perform_user_update}")
 
-        # 5. Update the user's account document
-        try:
-            # --- Verify Data Payload ---
-            # Ensure ONLY 'videosLiked' and 'videosDisliked' are sent for the 'accounts' update
+        # Exit early if no actual change occurred
+        if not perform_user_update:
+            context.log(f"No state change needed for user {user_id}, video {video_id}, type {interaction_type}. Interaction was redundant.")
+            context.log("--- Likes Manager Invocation End (No Change) ---")
+            return context.res.text("No change", 200) # 200 OK is fine for event functions
+
+        # 4. Update user's account document IF needed
+        if perform_user_update:
+            updated_liked_list = list(liked_set)
+            updated_disliked_list = list(disliked_set)
             account_update_data = {
                 'videosLiked': updated_liked_list,
                 'videosDisliked': updated_disliked_list
             }
-            context.log(f"Attempting to update ACCOUNTS collection document {user_id} with data: {account_update_data}")
+            databases.update_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id, account_update_data)
+            context.log(f"Updated account doc for user {user_id}. New counts: Likes={len(updated_liked_list)}, Dislikes={len(updated_disliked_list)}")
 
-            databases.update_document(
-                database_id=DATABASE_ID,
-                collection_id=ACCOUNTS_COLLECTION_ID, # Targeting the accounts collection
-                document_id=user_id,
-                data=account_update_data # Use the verified data payload
-            )
-            context.log(f"Successfully updated account document for user {user_id}")
-        except AppwriteException as e:
-            context.error(f"Failed to update account document for user {user_id}: {e}")
-            # If updating the arrays fails, we should probably stop and report error
-            # The error message below matches the traceback seen previously
-            raise Exception(f"Failed to save updated like/dislike status. Message: {e.message}. Error: {e}")
-
-        # 6. Update counts on the 'video_counts' collection (same logic as before)
+        # 5. Update counts on 'video_counts' collection (if counts changed)
         if like_change != 0 or dislike_change != 0:
             context.log(f"Updating counts in 'video_counts' for video {video_id}...")
             current_likes = 0
             current_dislikes = 0
+            current_comments_json = '[]' # Need these for potential creation
+            current_comment_count = 0
             counts_doc_exists = False
             try:
                 counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
                 current_likes = counts_doc.get('likeCount', 0)
                 current_dislikes = counts_doc.get('dislikeCount', 0)
+                # Preserve comment info if doc exists
+                current_comments_json = counts_doc.get('commentsJson', '[]')
+                current_comment_count = counts_doc.get('commentCount', 0)
                 counts_doc_exists = True
                 context.log(f"Found counts document. Current counts: Likes={current_likes}, Dislikes={current_dislikes}")
             except AppwriteException as e:
@@ -213,51 +178,52 @@ def main(context):
                     counts_doc_exists = False
                     context.log(f"Counts document for video {video_id} not found. Will create.")
                 else:
-                    context.error(f"Error fetching counts document for {video_id}: {e}")
-                    # Proceed assuming 0 counts
+                    context.error(f"Error fetching counts document for {video_id}: {e}. Assuming counts=0.")
+                    # Continue assuming 0 counts, but log the error
 
             new_like_count = max(0, current_likes + like_change)
             new_dislike_count = max(0, current_dislikes + dislike_change)
 
             try:
                 if counts_doc_exists:
+                    counts_update_data = {'likeCount': new_like_count, 'dislikeCount': new_dislike_count}
                     databases.update_document(
                         database_id=DATABASE_ID, collection_id=VIDEO_COUNTS_COLLECTION_ID, document_id=video_id,
-                        data={'likeCount': new_like_count, 'dislikeCount': new_dislike_count}
+                        data=counts_update_data
                     )
                     context.log(f"Updated counts for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
                 else:
+                    counts_create_data = {
+                        'likeCount': new_like_count,
+                        'dislikeCount': new_dislike_count,
+                        'commentsJson': current_comments_json, # Initialize comment fields
+                        'commentCount': current_comment_count
+                    }
                     databases.create_document(
                         database_id=DATABASE_ID, collection_id=VIDEO_COUNTS_COLLECTION_ID, document_id=video_id,
-                        data={'likeCount': new_like_count, 'dislikeCount': new_dislike_count},
+                        data=counts_create_data,
                         permissions=[Permission.read(Role.any())] # Allow anyone to read counts
                     )
                     context.log(f"Created counts document for video {video_id}: Likes={new_like_count}, Dislikes={new_dislike_count}")
             except AppwriteException as e:
-                context.error(f"Failed to update/create counts document for {video_id}: {e}") # Log error but don't fail the whole request
+                # Log error updating/creating counts, but don't fail the whole function
+                # The user's state was updated, which is the primary goal here.
+                context.error(f"Failed to update/create counts document for {video_id}: {e}")
         else:
-            context.log("No count changes required.")
+            context.log("No count changes required for video_counts.")
 
-        # === End Core Logic ===
-
-        # 7. Determine final integer status based on updated lists and return success response
-        final_integer_status = 0
-        if video_id in updated_liked_list:
-            final_integer_status = 1
-        elif video_id in updated_disliked_list:
-            final_integer_status = -1
-
-        success_payload = { "success": "true", "newStatus": final_integer_status }
-        context.log(f"Action '{action}' completed successfully. Returning: {success_payload}")
+        # --- Success ---
+        context.log(f"Successfully processed interaction {interaction_doc_id} of type '{interaction_type}'")
         context.log("--- Likes Manager Invocation End (Success) ---")
-        return context.res.json(success_payload) # Return the configured response
+        return context.res.text("Processed interaction", 200)
 
+    except AppwriteException as e:
+        context.error(f"Appwrite Error during processing: {e.message} (Code: {e.code})")
+        context.log("--- Likes Manager Invocation End (Appwrite Error) ---")
+        return context.res.text(f"Appwrite Error: {e.message}", 500) # Internal Server Error for function context
     except Exception as e:
-        error_message = f"Unexpected error processing like/dislike: {e}"
-        context.error(error_message) # Log only the message
-        response_payload = {"success": "false", "message": f"Server error: {e}"}
-        response_status = 500
-        # --- Log Response Before Returning ---
-        context.log(f"Exiting with Error - Status: {response_status}, Payload: {response_payload}")
-        context.log("--- Likes Manager Invocation End (Error) ---")
-        return context.res.json(response_payload, statusCode=response_status) # Return the configured response
+        context.error(f"Unexpected Error: {e}")
+        import traceback
+        context.error(traceback.format_exc()) # Log full traceback for unexpected errors
+        context.log("--- Likes Manager Invocation End (Unexpected Error) ---")
+        return context.res.text(f"Unexpected Server Error: {e}", 500)

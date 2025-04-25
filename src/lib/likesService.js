@@ -1,69 +1,63 @@
-import { functions } from './appwriteConfig';
-import { appwriteConfig } from './appwriteConfig';
-
-// IMPORTANT: Ensure this matches the ID in your appwrite.json and Appwrite console
-const LIKES_FUNCTION_ID = 'likes-manager'; // Revert to the actual likes manager function
+import { databases, appwriteConfig } from './appwriteConfig';
+import { ID, Permission, Role } from 'appwrite';
 
 /**
- * Calls the backend function to toggle like/dislike status for a video.
- * @param {string} videoId - The ID of the video.
- * @param {'like' | 'dislike'} action - The action to perform.
- * @returns {Promise<object>} - The result from the function execution (e.g., { success: true, newStatus: 'liked' }).
- * @throws {Error} - Throws an error if the function call fails.
+ * Records a like/dislike interaction in the database.
+ * This function DOES NOT return the final counts or status.
+ * UI updates should be handled optimistically and via Realtime.
+ *
+ * @param {string} videoId - The ID of the video being interacted with.
+ * @param {'like' | 'dislike'} action - The type of interaction.
+ * @param {string} userId - The ID of the user performing the interaction.
+ * @returns {Promise<{success: boolean, message: string}>} - Confirmation of recording.
+ * @throws {Error} - Throws an error if recording the interaction fails.
  */
-export const toggleLikeDislike = async (videoId, action) => {
-  if (!videoId || !action) {
-    throw new Error('Video ID and action are required.');
+export const toggleLikeDislike = async (videoId, action, userId) => {
+  // Validate inputs
+  if (!videoId || (action !== 'like' && action !== 'dislike')) {
+    throw new Error('Video ID and a valid action ("like" or "dislike") are required.');
+  }
+  if (!userId) {
+    // This function must be called by an authenticated user context
+    throw new Error("User ID is required to record like/dislike interaction.");
   }
 
-  console.log(`[likesService] Calling function ${LIKES_FUNCTION_ID} for video ${videoId}, action: ${action}`);
+  console.log(`[likesService] Recording interaction: video ${videoId}, action: ${action}, user: ${userId}`);
 
   try {
-    // Execute the function, sending data in the body
-    const result = await functions.createExecution(
-      LIKES_FUNCTION_ID,
-      JSON.stringify({ // Pass data as a JSON string in the body
-        videoId: videoId,
-        action: action,
-      }),
-      false, // async = false (wait for response)
-      '/', // path (use default '/')
-      'POST' // method (important!)
+    // Data for the new interaction document
+    const interactionData = {
+      videoId: videoId,
+      type: action,
+      // DO NOT include userId attribute here
+    };
+
+    // Permissions for the interaction document: Only the creator can manage it.
+    // The backend function identifies the user via these permissions.
+    const docPermissions = [
+      Permission.read(Role.user(userId)),   // User can read their own interaction
+      Permission.update(Role.user(userId)), // User can update (though unlikely needed)
+      Permission.delete(Role.user(userId)), // User can delete their interaction
+      // Read permission for backend function (using API key) is implicit
+    ];
+
+    // Create the document in the video_interactions collection
+    const response = await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.videoInteractionsCollectionId, // Target the new collection
+      ID.unique(), // Generate a unique document ID
+      interactionData,
+      docPermissions // Apply document-level permissions
     );
 
-    console.log(`[likesService] Raw function result:`, result);
+    console.log(`[likesService] Interaction document created successfully:`, response.$id);
 
-    // Check if the function execution itself failed (e.g., timeout, permissions)
-    if (result.status === 'failed') {
-      console.error('Like/Dislike function execution failed:', result.stderr || result.response);
-      throw new Error(`Failed to ${action} video. Function execution error.`);
-    }
-
-    // Attempt to parse the JSON response body from the function
-    let responseData = {};
-    try {
-        responseData = JSON.parse(result.responseBody);
-        console.log(`[likesService] Parsed function response:`, responseData);
-        console.log(`[likesService] Parsed responseData.success: ${responseData.success} (Type: ${typeof responseData.success})`);
-        console.log(`[likesService] Parsed responseData.newStatus: ${responseData.newStatus} (Type: ${typeof responseData.newStatus})`);
-    } catch (parseError) {
-        console.error("[likesService] Could not parse JSON response from likes function:", result.responseBody, parseError);
-        // Treat non-JSON response as an error from the function's perspective
-        throw new Error(`Failed to ${action} video. Unexpected response from function.`);
-    }
-
-    // Check the 'success' flag (which is now a string 'true' or 'false')
-    if (responseData.success !== 'true') { // Check for the string "true"
-      console.error(`[likesService] Function indicated failure:`, responseData.message);
-      throw new Error(responseData.message || `Failed to ${action} video.`);
-    }
-
-    // Return the parsed data (e.g., { success: true, newStatus: 'liked' })
-    return responseData;
+    // Return confirmation that the interaction was recorded
+    return { success: true, message: "Interaction recorded." };
 
   } catch (error) {
-    console.error(`[likesService] Error calling like/dislike function for video ${videoId} (${action}):`, error);
-    // Rethrow a more specific error or the original error
-    throw new Error(error.message || `Failed to ${action} video.`);
+    console.error(`[likesService] Error recording interaction for video ${videoId} (Action: ${action}, User: ${userId}):`, error);
+    // Rethrow a more specific or the original error
+    throw new Error(error.message || `Failed to record ${action} interaction.`);
   }
 };

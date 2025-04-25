@@ -11,7 +11,7 @@ import { postComment, fetchCommentsForVideo } from '../lib/commentService'; // A
 import { deleteVideo } from '../lib/videoService'; // Import video deletion function
 
 // Appwrite Imports
-import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
+import { databases, storage, avatars as appwriteAvatars, account, client } from '../lib/appwriteConfig';
 import { appwriteConfig } from '../lib/appwriteConfig';
 import { Query } from 'appwrite'; // Import Query
 
@@ -119,13 +119,12 @@ const VideoDetail = () => {
     setLikeCount(prev => Math.max(0, prev + optimisticLikeChange));
     setDislikeCount(prev => Math.max(0, prev + optimisticDislikeChange));
 
-    // --- Call Backend ---
+    // --- Call Backend Service to RECORD the interaction ---
     try {
-      const result = await toggleLikeDislike(videoId, action);
-      // Success! Backend confirmed. Optimistic update was likely correct.
-      console.log('Like/Dislike function success:', result);
-      // Optionally update status definitively from result if needed
-      // setUserLikeStatus(result.newStatus);
+      // Pass videoId, action, AND the current user's ID
+      await toggleLikeDislike(videoId, action, currentUser.$id);
+      console.log(`[VideoDetail] Interaction ${action} recorded successfully for video ${videoId}`);
+      // Recording successful. Rely on optimistic state + Realtime for final truth.
 
     } catch (error) {
       console.error(`Failed to ${action} video:`, error);
@@ -490,6 +489,54 @@ const VideoDetail = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, videoId]); // Rerun when user data or videoId changes
+  
+  // --- Realtime updates subscription ---
+  useEffect(() => {
+    if (!videoId) return; // Don't subscribe if no video ID
+
+    // --- Subscribe to Video Counts ---
+    const countsCollection = `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.videoCountsCollectionId}.documents.${videoId}`;
+    const countsUnsubscribe = client.subscribe(countsCollection, (response) => {
+        console.log("Realtime Counts Update Received:", response.payload);
+        // Update state based on payload, handle potential nulls gracefully
+        setLikeCount(response.payload.likeCount ?? likeCount);
+        setDislikeCount(response.payload.dislikeCount ?? dislikeCount);
+        setVideoCommentCount(response.payload.commentCount ?? videoCommentCount);
+    });
+    console.log(`Realtime: Subscribed to ${countsCollection}`);
+
+    // --- Subscribe to User Account (if logged in) ---
+    let userUnsubscribe = null;
+    if (currentUser?.$id) {
+        const accountCollection = `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.accountsCollectionId}.documents.${currentUser.$id}`;
+        userUnsubscribe = client.subscribe(accountCollection, (response) => {
+            console.log("Realtime User Account Update Received:", response.payload);
+            const liked = (response.payload.videosLiked || []).includes(videoId);
+            const disliked = (response.payload.videosDisliked || []).includes(videoId);
+
+            // Update the button state based on the latest arrays from the user document
+            let newStatus = 0;
+            if (liked) newStatus = 1;
+            else if (disliked) newStatus = -1;
+
+            if (newStatus !== userLikeStatus) { // Only update if changed
+                console.log(`Realtime: Updating userLikeStatus from ${userLikeStatus} to ${newStatus}`);
+                setUserLikeStatus(newStatus);
+            }
+        });
+        console.log(`Realtime: Subscribed to ${accountCollection}`);
+    }
+
+    // Cleanup function: Unsubscribe when component unmounts or videoId/currentUser changes
+    return () => {
+        console.log("Realtime: Unsubscribing from updates...");
+        countsUnsubscribe();
+        if (userUnsubscribe) {
+            userUnsubscribe();
+        }
+    };
+  // Dependencies ensure re-subscription if videoId or user changes
+  }, [videoId, currentUser, likeCount, dislikeCount, videoCommentCount, userLikeStatus]); // Include states potentially updated by the callback
   
   // --- Effect to fetch subscriber count ---
   useEffect(() => {

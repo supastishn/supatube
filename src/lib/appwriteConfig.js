@@ -9,6 +9,7 @@ export const appwriteConfig = {
     accountsCollectionId: 'accounts',        // Accounts collection ID
     likesCollectionId: 'likes',              // Likes collection ID
     videoCountsCollectionId: 'video_counts', // Video counts collection ID
+    videoInteractionsCollectionId: 'video_interactions', // Video interactions collection ID
     channelStatsCollectionId: 'channel_stats', // Channel stats collection ID
 };
 

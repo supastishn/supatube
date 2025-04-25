@@ -21,7 +21,7 @@ const Subscriptions = () => <div>Subscriptions Page</div>;
 const History = () => <div>History Page</div>;
 const YourVideos = () => <div>Your Videos Page</div>;
 const WatchLater = () => <div>Watch Later Page</div>;
-const LikedVideos = () => <div>Liked Videos Page</div>;
+import LikedVideos from './pages/LikedVideos'; // Import the actual component
 
 
 function App() {

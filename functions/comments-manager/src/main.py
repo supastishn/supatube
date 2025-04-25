@@ -20,6 +20,20 @@ MAX_COMMENT_LENGTH = 2000
 def add_reply(comments, parent_id, new_reply):
     for comment in comments:
         if comment.get('commentId') == parent_id:
+            # Ensure 'replies' key exists and is a list
+            if 'replies' not in comment or not isinstance(comment.get('replies'), list):
+                comment['replies'] = []
+            comment['replies'].insert(0, new_reply) # Insert new replies at the beginning
+            return True
+        # Recursively search in existing replies
+        if isinstance(comment.get('replies'), list) and add_reply(comment['replies'], parent_id, new_reply):
+            return True
+    return False
+
+# Helper function to find and add a reply recursively
+def add_reply(comments, parent_id, new_reply):
+    for comment in comments:
+        if comment.get('commentId') == parent_id:
             comment.setdefault('replies', []).insert(0, new_reply) # Insert at beginning
             return True
         if 'replies' in comment and add_reply(comment['replies'], parent_id, new_reply):

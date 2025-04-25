@@ -376,27 +376,26 @@ const VideoDetail = () => {
   }, [videoId]); // Re-run effect when videoId changes
   
   // --- Effect to fetch comments ---
-  useEffect(() => {
+  const loadComments = useCallback(async () => {
     if (!videoId) return;
-
-    const loadComments = async () => {
-      setLoadingComments(true);
-      setCommentsError('');
-      try {
-        const fetchedComments = await fetchCommentsForVideo(videoId);
-        // Client-side sort (optional, backend already inserts newest first)
-        // fetchedComments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setComments(fetchedComments);
-      } catch (error) {
-        console.error("Failed to fetch comments:", error);
-        setCommentsError("Could not load comments. Please try again later.");
-      } finally {
-        setLoadingComments(false);
-      }
-    };
-
-    loadComments();
+    setLoadingComments(true);
+    setCommentsError('');
+    try {
+      const fetchedComments = await fetchCommentsForVideo(videoId);
+      // Client-side sort (optional, backend already inserts newest first)
+      // fetchedComments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setComments(fetchedComments);
+    } catch (error) {
+      console.error("Failed to fetch comments:", error);
+      setCommentsError("Could not load comments. Please try again later.");
+    } finally {
+      setLoadingComments(false);
+    }
   }, [videoId]); // Re-run when videoId changes
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]); // Depend on the memoized function
 
   // --- Effect to fetch video counts (likes, dislikes, comments) ---
   useEffect(() => {
@@ -752,7 +751,12 @@ const VideoDetail = () => {
           ) : (
             <div className="comments-list">
               {comments.map(comment => (
-                <Comment key={comment.commentId} comment={comment} />
+                <Comment 
+                  key={comment.commentId} 
+                  comment={comment}
+                  videoId={videoId}
+                  onReplyPosted={loadComments}
+                />
               ))}
             </div>
           )}

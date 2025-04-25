@@ -45,7 +45,14 @@ const Auth = ({ type }) => {
     try {
       if (isSignin) {
         await login(email, password);
-        // Redirect to previous page or home
+
+        // Add a 3-second delay then reload
+        setTimeout(() => {
+          console.log('Reloading page after 3 seconds...');
+          window.location.reload();
+        }, 3000); // 3000 milliseconds = 3 seconds
+
+        // Redirect to previous page or home (this will happen before the reload)
         const from = location.state?.from?.pathname || "/";
         navigate(from, { replace: true });
       } else {

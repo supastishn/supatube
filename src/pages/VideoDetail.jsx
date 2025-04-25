@@ -6,6 +6,8 @@ import { Fragment } from 'react'; // Import Fragment if needed for structure
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 import { toggleLikeDislike } from '../lib/likesService'; // Import like service
 import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
+import Comment from '../components/Comment'; // Add this
+import { postComment, fetchCommentsForVideo } from '../lib/commentService'; // Add this
 
 // Appwrite Imports
 import { databases, storage, avatars as appwriteAvatars, account } from '../lib/appwriteConfig';
@@ -45,6 +47,15 @@ const VideoDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFullBio, setShowFullBio] = useState(false); // Renamed state
+  
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(true);
+  const [commentsError, setCommentsError] = useState('');
+  const [newCommentText, setNewCommentText] = useState('');
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [commentPostError, setCommentPostError] = useState('');
+  // Add state for video comment count (optional, could read from video state)
+  const [videoCommentCount, setVideoCommentCount] = useState(0);
 
   // --- Add new state variables ---
   const [likeCount, setLikeCount] = useState(0);
@@ -338,6 +349,8 @@ const VideoDetail = () => {
         };
 
         setVideo(fetchedVideo);
+        // Set comment count from video doc if available (for display)
+        setVideoCommentCount(doc.commentCount || 0); // Add this line
 
         // --- Fetch Related Videos (Keep simulation for now or implement later) ---
         // TODO: Replace with actual related videos fetch logic (e.g., based on tags, channel)
@@ -361,6 +374,29 @@ const VideoDetail = () => {
 
     fetchVideoData();
   }, [videoId]); // Re-run effect when videoId changes
+  
+  // --- Effect to fetch comments ---
+  useEffect(() => {
+    if (!videoId) return;
+
+    const loadComments = async () => {
+      setLoadingComments(true);
+      setCommentsError('');
+      try {
+        const fetchedComments = await fetchCommentsForVideo(videoId);
+        // Client-side sort (optional, backend already inserts newest first)
+        // fetchedComments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setComments(fetchedComments);
+      } catch (error) {
+        console.error("Failed to fetch comments:", error);
+        setCommentsError("Could not load comments. Please try again later.");
+      } finally {
+        setLoadingComments(false);
+      }
+    };
+
+    loadComments();
+  }, [videoId]); // Re-run when videoId changes
 
   // --- New effect to fetch like/dislike counts ---
   useEffect(() => {
@@ -452,6 +488,34 @@ const VideoDetail = () => {
     fetchSubCount();
   }, [video?.channel?.creatorUserId]); // Re-run when creator ID changes
 
+  const handlePostComment = async (e) => {
+    e.preventDefault(); // Prevent form submission page reload
+    if (!currentUser) {
+      navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
+      return;
+    }
+    const trimmedComment = newCommentText.trim();
+    if (!trimmedComment || isPostingComment) {
+      return; // Ignore empty comments or if already posting
+    }
+
+    setIsPostingComment(true);
+    setCommentPostError('');
+
+    try {
+      const newComment = await postComment(videoId, trimmedComment);
+      // Add new comment to the top of the list (optimistic update)
+      setComments(prevComments => [newComment, ...prevComments]);
+      setNewCommentText(''); // Clear input field
+      setVideoCommentCount(prev => prev + 1); // Increment local count
+    } catch (error) {
+      console.error("Failed to post comment:", error);
+      setCommentPostError(error.message || "Failed to post comment.");
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
   // --- Effect to derive initial subscription status from user context ---
   useEffect(() => {
     if (currentUser && video?.channel?.creatorUserId) {
@@ -490,6 +554,8 @@ const VideoDetail = () => {
   }
 
   // --- Successful Render ---
+  
+  const MAX_COMMENT_LENGTH = 2000;
 
   // Prepare bio display
   const bioLines = (video.channel.bio || '').split('\n'); // Use bio from channel object
@@ -641,8 +707,99 @@ const VideoDetail = () => {
             </div>
         </div>
 
-        {/* TODO: Add Comments Section */}
-        {/* <div className="comments-section"> ... </div> */}
+        {/* Comments Section */}
+        <div className="comments-section">
+          {/* Comment Count Header */}
+          <h3 className="comments-count">
+            {loadingComments ? '...' : `${comments.length}`} Comments
+            {/* Or use videoCommentCount: {loadingCounts ? '...' : videoCommentCount} Comments */}
+          </h3>
+
+          {/* Comment Input Form */}
+          {currentUser && ( // Only show form if logged in
+            <form onSubmit={handlePostComment} className="comment-form">
+              <textarea
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                placeholder="Add a comment..."
+                rows="3"
+                required
+                maxLength={MAX_COMMENT_LENGTH} // Same as backend limit
+                disabled={isPostingComment}
+              />
+              {commentPostError && <p className="form-error">{commentPostError}</p>}
+              <button type="submit" className="btn-primary" disabled={isPostingComment || !newCommentText.trim()}>
+                {isPostingComment ? 'Posting...' : 'Comment'}
+              </button>
+            </form>
+          )}
+          {!currentUser && (
+             <p className="login-prompt">Please <Link to="/sign-in" state={{ from: { pathname: `/videos/${videoId}` } }}>sign in</Link> to comment.</p>
+          )}
+
+          {/* Display Comments */}
+          {loadingComments ? (
+            <p>Loading comments...</p>
+          ) : commentsError ? (
+            <p className="error-message">{commentsError}</p>
+          ) : comments.length === 0 ? (
+            <p>No comments yet. Be the first!</p>
+          ) : (
+            <div className="comments-list">
+              {comments.map(comment => (
+                <Comment key={comment.commentId} comment={comment} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Add Styles for Comments Section */}
+        <style jsx>{`
+          .comments-section {
+            margin-top: 24px;
+          }
+          .comments-count {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--light-gray);
+          }
+          .comment-form {
+            margin-bottom: 24px;
+          }
+          .comment-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color, #ccc);
+            border-radius: 4px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 60px;
+            margin-bottom: 8px;
+          }
+          .comment-form button {
+            float: right; /* Align button right */
+          }
+          .login-prompt {
+             margin-bottom: 24px;
+             color: var(--text-secondary);
+          }
+           .login-prompt a {
+              color: var(--primary);
+              font-weight: 500;
+           }
+          .comments-list {
+            display: flex;
+            flex-direction: column;
+          }
+          .error-message, .form-error { /* Basic error styling */
+             color: red;
+             font-size: 14px;
+             margin-top: 5px;
+             margin-bottom: 15px;
+          }
+        `}</style>
 
       </div>
 

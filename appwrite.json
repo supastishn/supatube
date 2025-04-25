@@ -138,6 +138,27 @@
             "path": "functions/test"
         },
         {
+            "$id": "comments-manager",
+            "execute": [
+                "users"
+            ],
+            "name": "comments-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "documents.read",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/comments-manager"
+        },
+        {
             "$id": "subscriptions-manager",
             "execute": [
                 "users"
@@ -236,6 +257,14 @@
                     "min": 0,
                     "max": 999999999,
                     "default": 0
+                },
+                {
+                    "key": "commentsJson",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 10000000,
+                    "default": "[]"
                 }
             ],
             "indexes": [

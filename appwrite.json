@@ -282,6 +282,55 @@
     ],
     "collections": [
         {
+            "$id": "user_video_states",
+            "$permissions": [
+                "read(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "User Video States",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "userId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "state",
+                    "type": "string",
+                    "required": true,
+                    "size": 10,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "userId_videoId",
+                    "type": "key",
+                    "status": "available",
+                    "attributes": ["userId", "videoId"],
+                    "orders": ["ASC", "ASC"]
+                },
+                {
+                    "key": "userId",
+                    "type": "key",
+                    "status": "available",
+                    "attributes": ["userId"],
+                    "orders": ["ASC"]
+                }
+            ]
+        },
+        {
             "$id": "videos",
             "$permissions": [
                 "read(\"guests\")",
@@ -401,22 +450,6 @@
                     "required": true,
                     "array": false,
                     "size": 100,
-                    "default": null
-                },
-                {
-                    "key": "videosLiked",
-                    "type": "string",
-                    "required": true,
-                    "array": true,
-                    "size": 999999,
-                    "default": null
-                },
-                {
-                    "key": "videosDisliked",
-                    "type": "string",
-                    "required": true,
-                    "array": true,
-                    "size": 999999,
                     "default": null
                 },
                 {

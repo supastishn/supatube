@@ -2,68 +2,114 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { account, avatars, databases } from '../lib/appwriteConfig';
 import { appwriteConfig } from '../lib/appwriteConfig';
-import { ID, Permission, Role } from 'appwrite';
+import { ID, Permission, Role, Query } from 'appwrite';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // Keep core user data (id, name, email)
+  const [accountDetails, setAccountDetails] = useState({ // State for bio, profile image, subs
+      bio: '',
+      profileImageUrl: null,
+      subscribingTo: []
+  });
+  const [likedVideoIds, setLikedVideoIds] = useState(new Set());
+  const [dislikedVideoIds, setDislikedVideoIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkUserStatus();
   }, []);
 
-  // Helper to fetch account details (bio, profileImageUrl)
-  const fetchAccountDetails = async (userId) => {
+  // Helper to fetch user data including video states
+  const fetchUserDataAndStates = async (userId) => {
+    let accountDoc = null;
+    let fetchedLikedIds = new Set();
+    let fetchedDislikedIds = new Set();
+
+    // Fetch core account details first
     try {
-      const doc = await databases.getDocument(
-        appwriteConfig.databaseId,
-        appwriteConfig.accountsCollectionId,
-        userId
-      );
-      return {
-        bio: doc.bio,
-        profileImageUrl: doc.profileImageUrl,
-        videosLiked: doc.videosLiked || [], // Add this, default to empty array
-        videosDisliked: doc.videosDisliked || [], // Add this, default to empty array
-        subscribingTo: doc.subscribingTo || [] // Add subscribingTo field
-      };
+        accountDoc = await databases.getDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.accountsCollectionId,
+            userId
+        );
     } catch (error) {
-      // Handle 404 Not Found specifically - means no profile doc exists yet
-      if (error.code === 404) {
-        return { bio: '', profileImageUrl: null, videosLiked: [], videosDisliked: [], subscribingTo: [] }; // Add defaults
-      }
-      console.error("Failed to fetch account details:", error);
-      // Return defaults for other errors
-      return { bio: '', profileImageUrl: null };
+        if (error.code !== 404) {
+            console.error("Failed to fetch account details:", error);
+        }
+        // Proceed even if account doc doesn't exist yet, defaults will be used
     }
+
+    // Fetch video states
+    try {
+        console.log(`[AuthContext] Fetching video states for user ${userId}...`);
+        // Simple fetch up to 5000 states (adjust limit if needed, or implement pagination)
+        const stateResponse = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.userVideoStatesCollectionId, // Use the new collection ID
+            [
+                Query.equal('userId', userId),
+                Query.limit(5000) // Adjust limit as necessary
+            ]
+        );
+        stateResponse.documents.forEach(doc => {
+            if (doc.state === 'liked') {
+                fetchedLikedIds.add(doc.videoId);
+            } else if (doc.state === 'disliked') {
+                fetchedDislikedIds.add(doc.videoId);
+            }
+        });
+        console.log(`[AuthContext] Fetched ${fetchedLikedIds.size} liked, ${fetchedDislikedIds.size} disliked states.`);
+    } catch (stateError) {
+        console.error("Failed to fetch user video states:", stateError);
+        // Proceed with empty sets on error
+    }
+
+    return {
+        bio: accountDoc?.bio || '', // Default if doc or field is missing
+        profileImageUrl: accountDoc?.profileImageUrl || null,
+        subscribingTo: accountDoc?.subscribingTo || [],
+        initialLikedIds: fetchedLikedIds,
+        initialDislikedIds: fetchedDislikedIds
+    };
   };
 
   // Check if user is logged in and fetch preferences
   const checkUserStatus = async () => {
-    setLoading(true); // Ensure loading is true at the start
+    setLoading(true);
     try {
-      const currentAccount = await account.get();
-      // Fetch details from 'accounts' collection instead of prefs
-      const accountDetails = await fetchAccountDetails(currentAccount.$id);
-      setUser({ ...currentAccount, ...accountDetails }); // Merge account data with details
+        const currentAccount = await account.get();
+        const userData = await fetchUserDataAndStates(currentAccount.$id); // Fetch combined data
+
+        setUser(currentAccount); // Set core user data
+        setAccountDetails({ // Set details separately
+            bio: userData.bio,
+            profileImageUrl: userData.profileImageUrl,
+            subscribingTo: userData.subscribingTo
+        });
+        setLikedVideoIds(userData.initialLikedIds);
+        setDislikedVideoIds(userData.initialDislikedIds);
+
+        console.log("[AuthContext] User status checked, state updated.");
+
     } catch (error) {
-      // Only log error if it's not the expected "not logged in" error (401)
-      if (error.code !== 401) {
-        console.error("Error checking user status:", error);
-      }
-      setUser(null);
+        if (error.code !== 401) {
+            console.error("Error checking user status:", error);
+        }
+        setUser(null);
+        setAccountDetails({ bio: '', profileImageUrl: null, subscribingTo: [] }); // Reset details
+        setLikedVideoIds(new Set()); // Reset sets
+        setDislikedVideoIds(new Set());
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
   // Register new user
   const register = async (email, password, name) => {
     try {
-      // 1. Create the user account
       const newAccount = await account.create(
         ID.unique(),
         email,
@@ -73,37 +119,29 @@ export const AuthProvider = ({ children }) => {
       const userId = newAccount.$id;
 
       if (newAccount) {
-        // 2. Create the corresponding document in 'accounts' collection
-        // Use the new user's ID as the document ID
-        // Use the name and optional profileImageUrl provided during registration
         try {
           await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.accountsCollectionId,
-            userId, // Use the new user's ID as the document ID
-            {
-              name: name, // Store the provided name
-              bio: '', // Initialize bio as empty
-              profileImageUrl: null, // Initialize profileImageUrl as null
-              videosLiked: [], // Initialize empty array
-              videosDisliked: [], // Initialize empty array
-              subscribingTo: [] // Initialize empty subscription array
+            userId,
+            { // Data for the accounts document
+              name: name,
+              bio: '',
+              profileImageUrl: null,
+              subscribingTo: [] // REMOVED videosLiked, videosDisliked
             },
-            [
-              Permission.read(Role.user(userId)), // User can read their own doc
-              Permission.update(Role.user(userId)), // User can update their own doc
-              Permission.read(Role.any()) // Make profiles publically readable
+            [ // Permissions
+              Permission.read(Role.user(userId)),
+              Permission.update(Role.user(userId)),
+              Permission.read(Role.any())
             ]
           );
           console.log(`[AuthContext] Successfully created account details document for user ${userId}.`);
         } catch (docError) {
           console.error("Failed to create account details document:", docError);
-          // Log the error, but proceed to login as the user account itself was created.
-          // For now, we proceed to login. The user can update details later.
+          // Proceed to login anyway
         }
-        
-        // Log in the user immediately after registration
-        await login(email, password); // login calls checkUserStatus which fetches the new doc
+        await login(email, password); // login will call checkUserStatus to fetch everything
       }
     } catch (error) {
       throw error;
@@ -113,12 +151,14 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (email, password) => {
     try {
-      await account.createEmailPasswordSession(email, password);
-      const currentAccount = await account.get();
-      setUser(currentAccount);
-      return currentAccount;
+        await account.createEmailPasswordSession(email, password);
+        // Call checkUserStatus to fetch all data including states
+        await checkUserStatus();
+        // Optional: return the user object if needed immediately after login
+        // const loggedInUser = await account.get();
+        // return loggedInUser;
     } catch (error) {
-      throw error;
+        throw error;
     }
   };
 
@@ -142,73 +182,68 @@ export const AuthProvider = ({ children }) => {
   const updateUserProfile = async () => {
     try {
       const currentAccount = await account.get();
-      // Fetch details from 'accounts' collection
-      const accountDetails = await fetchAccountDetails(currentAccount.$id);
-      setUser({ ...currentAccount, ...accountDetails });
-      console.log("Updated user profile in context:", { ...currentAccount, ...accountDetails });
-      return { ...currentAccount, ...accountDetails }; // Return updated user object
+      const userData = await fetchUserDataAndStates(currentAccount.$id); // Re-fetch combined data
+
+      setUser(currentAccount); // Update core user data
+      setAccountDetails({ // Update details separately
+          bio: userData.bio,
+          profileImageUrl: userData.profileImageUrl,
+          subscribingTo: userData.subscribingTo
+      });
+      setLikedVideoIds(userData.initialLikedIds);
+      setDislikedVideoIds(userData.initialDislikedIds);
+
+      console.log("[AuthContext] User profile context refreshed.");
+      // Return combined data if needed
+      // return { ...currentAccount, ...userData };
     } catch (error) {
-      // Failed to refresh user profile
-      // Optionally handle logout or error display if fetching fails critically
+      console.error("Failed to refresh user profile context:", error);
+      // Handle potential logout or error display
       return null;
     }
   };
 
-  const updateUserLikeDislikeState = (videoId, action) => {
-    setUser(currentUser => {
-      if (!currentUser) return null;
-
-      const currentLiked = new Set(currentUser.videosLiked || []);
-      const currentDisliked = new Set(currentUser.videosDisliked || []);
-      let changed = false;
-
-      if (action === 'like') {
-        if (currentLiked.has(videoId)) { // Toggle like off
-          currentLiked.delete(videoId);
-          changed = true;
-        } else { // Add like (remove dislike if present)
-          currentLiked.add(videoId);
-          if (currentDisliked.has(videoId)) {
-            currentDisliked.delete(videoId);
-          }
-          changed = true;
+  const updateClientVideoStates = (videoId, action) => {
+    setLikedVideoIds(currentLiked => {
+        const newLiked = new Set(currentLiked);
+        if (action === 'like') {
+            if (newLiked.has(videoId)) newLiked.delete(videoId); // Toggle off
+            else newLiked.add(videoId); // Toggle on
+        } else if (action === 'dislike') {
+            newLiked.delete(videoId); // Remove like if disliking
         }
-      } else if (action === 'dislike') {
-        if (currentDisliked.has(videoId)) { // Toggle dislike off
-          currentDisliked.delete(videoId);
-          changed = true;
-        } else { // Add dislike (remove like if present)
-          currentDisliked.add(videoId);
-          if (currentLiked.has(videoId)) {
-            currentLiked.delete(videoId);
-          }
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        console.log(`[AuthContext] Updated client state for ${videoId}, action ${action}. New Likes: ${currentLiked.size}, Dislikes: ${currentDisliked.size}`);
-        return {
-          ...currentUser,
-          videosLiked: Array.from(currentLiked),
-          videosDisliked: Array.from(currentDisliked)
-        };
-      }
-      return currentUser; // No change
+        console.log(`[AuthContext Optimistic] Liked set updated. Size: ${newLiked.size}`);
+        return newLiked;
     });
+    setDislikedVideoIds(currentDisliked => {
+        const newDisliked = new Set(currentDisliked);
+        if (action === 'dislike') {
+            if (newDisliked.has(videoId)) newDisliked.delete(videoId); // Toggle off
+            else newDisliked.add(videoId); // Toggle on
+        } else if (action === 'like') {
+            newDisliked.delete(videoId); // Remove dislike if liking
+        }
+         console.log(`[AuthContext Optimistic] Disliked set updated. Size: ${newDisliked.size}`);
+        return newDisliked;
+    });
+     console.log(`[AuthContext Optimistic] Updated client state sets for ${videoId}, action ${action}`);
   };
 
   const value = {
     user,
+    accountDetails, // Expose details separately
     loading,
+    likedVideoIds,      // Expose the Set
+    dislikedVideoIds,   // Expose the Set
     register,
     login,
     logout,
     getAvatarUrl,
     checkUserStatus,
     updateUserProfile,
-    updateUserLikeDislikeState,
-    account,
+    updateClientVideoStates, // Expose the new function
+    // remove updateUserLikeDislikeState
+    account, // Keep access to account service if needed elsewhere
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

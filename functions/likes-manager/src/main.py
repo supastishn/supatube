@@ -4,6 +4,7 @@ from appwrite.exception import AppwriteException
 from appwrite.permission import Permission
 from appwrite.role import Role
 from appwrite.query import Query
+from appwrite.id import ID
 import os
 import json
 
@@ -12,6 +13,7 @@ DATABASE_ID = "database"
 ACCOUNTS_COLLECTION_ID = "accounts"
 VIDEO_COUNTS_COLLECTION_ID = "video_counts"
 VIDEO_INTERACTIONS_COLLECTION_ID = "video_interactions"
+USER_VIDEO_STATES_COLLECTION_ID = "user_video_states"
 
 def main(context):
     context.log("--- Likes Manager Batch Job Start ---")
@@ -89,50 +91,66 @@ def main(context):
 
                 context.log(f"Processing interaction by User ID: {user_id} for Video ID: {video_id}, Type: {interaction_type}")
 
-                # --- Fetch User Account ---
+                # --- Query Current User State ---
+                current_state = 'neutral'
+                state_doc_id = None # To store the ID if found, for update/delete
                 try:
-                    account_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id)
-                    liked_set = set(account_doc.get('videosLiked', []) or [])
-                    disliked_set = set(account_doc.get('videosDisliked', []) or [])
-                    context.log(f"Fetched account for user {user_id}. Current likes: {len(liked_set)}, dislikes: {len(disliked_set)}")
-                except AppwriteException as e:
-                    if e.code == 404:
-                        context.error(f"Account document {user_id} not found for interaction {interaction_id}. Skipping.")
+                    state_response = databases.list_documents(
+                        DATABASE_ID,
+                        USER_VIDEO_STATES_COLLECTION_ID,
+                        [
+                            Query.equal('userId', user_id),
+                            Query.equal('videoId', video_id),
+                            Query.limit(1)
+                        ]
+                    )
+                    if state_response['total'] > 0:
+                        state_doc = state_response['documents'][0]
+                        current_state = state_doc.get('state')
+                        state_doc_id = state_doc['$id']
+                        context.log(f"Found existing state '{current_state}' for user {user_id}, video {video_id} (Doc ID: {state_doc_id})")
                     else:
-                        context.error(f"Error fetching account doc {user_id} for interaction {interaction_id}: {e}. Skipping.")
+                        context.log(f"No existing state found for user {user_id}, video {video_id}. Current state is 'neutral'.")
+                except AppwriteException as e:
+                    context.error(f"Error querying user_video_states for user {user_id}, video {video_id}: {e}. Assuming 'neutral'.")
+                    # Decide if you should continue or skip this interaction
                     failed_count += 1
-                    continue # Skip this interaction
+                    continue # Skip this interaction if state query fails
 
-                # --- Initialize Changes ---
+                # --- Calculate Count Changes and New State ---
                 like_change = 0
                 dislike_change = 0
-                update_user_account = False
-
-                # --- Reconciliation Logic ---
-                video_is_liked_in_account = video_id in liked_set
-                video_is_disliked_in_account = video_id in disliked_set
+                new_state = current_state # Start with the current state
 
                 if interaction_type == 'like':
-                    if video_is_liked_in_account: # Interaction matches current user state
-                        like_change = 1
-                        liked_set.discard(video_id) # Consume the state from user doc
-                        update_user_account = True
-                        context.log(f"Interaction {interaction_id} (like) matches user state. like_change=1, removing from user doc.")
-                    else: # Interaction is stale (user unliked or disliked later)
+                    if current_state == 'liked': # Toggle off
+                        new_state = 'neutral'
                         like_change = -1
-                        context.log(f"Interaction {interaction_id} (like) is stale. like_change=-1.")
-                        # Do not modify user account
+                        context.log(f"Interaction {interaction_id} (like) toggles OFF existing 'liked' state. like_change={like_change}")
+                    elif current_state == 'disliked': # Change from dislike to like
+                        new_state = 'liked'
+                        like_change = 1
+                        dislike_change = -1 # Decrement dislike count
+                        context.log(f"Interaction {interaction_id} (like) changes 'disliked' to 'liked'. like_change={like_change}, dislike_change={dislike_change}")
+                    else: # current_state == 'neutral'
+                        new_state = 'liked'
+                        like_change = 1
+                        context.log(f"Interaction {interaction_id} (like) sets 'neutral' to 'liked'. like_change={like_change}")
 
                 elif interaction_type == 'dislike':
-                    if video_is_disliked_in_account: # Interaction matches current user state
-                        dislike_change = 1
-                        disliked_set.discard(video_id) # Consume the state from user doc
-                        update_user_account = True
-                        context.log(f"Interaction {interaction_id} (dislike) matches user state. dislike_change=1, removing from user doc.")
-                    else: # Interaction is stale (user undisliked or liked later)
+                    if current_state == 'disliked': # Toggle off
+                        new_state = 'neutral'
                         dislike_change = -1
-                        context.log(f"Interaction {interaction_id} (dislike) is stale. dislike_change=-1.")
-                        # Do not modify user account
+                        context.log(f"Interaction {interaction_id} (dislike) toggles OFF existing 'disliked' state. dislike_change={dislike_change}")
+                    elif current_state == 'liked': # Change from like to dislike
+                        new_state = 'disliked'
+                        dislike_change = 1
+                        like_change = -1 # Decrement like count
+                        context.log(f"Interaction {interaction_id} (dislike) changes 'liked' to 'disliked'. dislike_change={dislike_change}, like_change={like_change}")
+                    else: # current_state == 'neutral'
+                        new_state = 'disliked'
+                        dislike_change = 1
+                        context.log(f"Interaction {interaction_id} (dislike) sets 'neutral' to 'disliked'. dislike_change={dislike_change}")
                 else:
                     context.error(f"Unknown interaction type '{interaction_type}' for interaction {interaction_id}. Skipping.")
                     failed_count += 1
@@ -194,19 +212,54 @@ def main(context):
                 else:
                     context.log(f"No count change needed for interaction {interaction_id}.")
 
-                # --- Update User Account (if needed) ---
-                if update_user_account:
-                    try:
-                        user_update_data = {
-                            'videosLiked': list(liked_set),
-                            'videosDisliked': list(disliked_set)
+                # --- Update user_video_states Collection ---
+                try:
+                    if new_state == 'neutral':
+                        if state_doc_id: # Only delete if a document existed
+                            context.log(f"New state is 'neutral', deleting state doc {state_doc_id}...")
+                            databases.delete_document(DATABASE_ID, USER_VIDEO_STATES_COLLECTION_ID, state_doc_id)
+                            context.log(f"Deleted state doc {state_doc_id}.")
+                        else:
+                             context.log("New state is 'neutral', no existing doc to delete.")
+                    elif new_state == 'liked' or new_state == 'disliked':
+                        state_data = {
+                            'userId': user_id,
+                            'videoId': video_id,
+                            'state': new_state
                         }
-                        databases.update_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id, user_update_data)
-                        context.log(f"Updated account doc {user_id} after interaction {interaction_id}.")
-                    except AppwriteException as e:
-                        context.error(f"Failed to update account {user_id} after interaction {interaction_id}: {e}. Counts may have been updated, but interaction won't be deleted.")
-                        failed_count += 1
-                        continue # Skip deletion if user update fails
+                        # Define permissions for the state document - only the user can read/manage it
+                        state_permissions = [
+                            Permission.read(Role.user(user_id)),
+                            Permission.update(Role.user(user_id)),
+                            Permission.delete(Role.user(user_id))
+                        ]
+
+                        if state_doc_id: # Update existing document
+                            context.log(f"Updating state doc {state_doc_id} to '{new_state}'...")
+                            databases.update_document(
+                                DATABASE_ID,
+                                USER_VIDEO_STATES_COLLECTION_ID,
+                                state_doc_id,
+                                {'state': new_state} # Only update the state field
+                            )
+                            context.log(f"Updated state doc {state_doc_id}.")
+                        else: # Create new document
+                            context.log(f"Creating new state doc with state '{new_state}'...")
+                            new_state_doc = databases.create_document(
+                                DATABASE_ID,
+                                USER_VIDEO_STATES_COLLECTION_ID,
+                                ID.unique(), # Use unique ID
+                                state_data,
+                                state_permissions # Apply permissions on creation
+                            )
+                            context.log(f"Created new state doc {new_state_doc['$id']}.")
+                    else:
+                        context.log(f"Warning: Unexpected new_state '{new_state}' - no action taken on user_video_states.")
+
+                except AppwriteException as e:
+                    context.error(f"Failed to update user_video_states for user {user_id}, video {video_id}: {e}. Interaction {interaction_id} will NOT be deleted.")
+                    failed_count += 1
+                    continue # Skip deleting the interaction log if state update fails
 
                 # --- Delete Interaction ---
                 try:

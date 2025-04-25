@@ -11,6 +11,7 @@ export const appwriteConfig = {
     videoCountsCollectionId: 'video_counts', // Video counts collection ID
     videoInteractionsCollectionId: 'video_interactions', // Video interactions collection ID
     channelStatsCollectionId: 'channel_stats', // Channel stats collection ID
+    userVideoStatesCollectionId: 'user_video_states', // User video states collection ID
 };
 
 // Initialize Appwrite client

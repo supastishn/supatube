@@ -40,7 +40,7 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
-  const { user: currentUser, updateUserLikeDislikeState } = useAuth(); // Get current user and like/dislike updater
+  const { user: currentUser, likedVideoIds, dislikedVideoIds, updateClientVideoStates } = useAuth(); // Import new state/function
   const navigate = useNavigate(); // For redirecting to sign-in
 
   const [video, setVideo] = useState(null);
@@ -86,52 +86,61 @@ const VideoDetail = () => {
     setIsLiking(true);
     setLikeError('');
 
+    // Determine current status *before* optimistic update for count logic
+    const wasLiked = likedVideoIds.has(videoId);
+    const wasDisliked = dislikedVideoIds.has(videoId);
+    let currentStatus = 0;
+    if (wasLiked) currentStatus = 1;
+    else if (wasDisliked) currentStatus = -1;
+
     // Store previous local count state for potential *count* rollback
     const previousLikeCount = likeCount;
     const previousDislikeCount = dislikeCount;
 
-    // 1. Update AuthContext state IMMEDIATELY
-    updateUserLikeDislikeState(videoId, action);
+    // 1. Update AuthContext client state sets IMMEDIATELY
+    updateClientVideoStates(videoId, action); // Use the new function
 
     // 2. Optimistically update LOCAL counts for UI feedback
-    // This logic calculates the *change* caused by the current click
+    // Use the status *before* the update to calculate the change
     if (action === 'like') {
-        if (userLikeStatus === 1) { // Was liked, now toggling off
+        if (currentStatus === 1) { // Was liked, now toggling off
             setLikeCount(prev => Math.max(0, prev - 1));
         } else { // Was neutral or disliked, now liking
             setLikeCount(prev => prev + 1);
-            if (userLikeStatus === -1) {
+            if (currentStatus === -1) { // Was disliked
                 setDislikeCount(prev => Math.max(0, prev - 1)); // Remove dislike count too
             }
         }
     } else { // action === 'dislike'
-        if (userLikeStatus === -1) { // Was disliked, now toggling off
+        if (currentStatus === -1) { // Was disliked, now toggling off
             setDislikeCount(prev => Math.max(0, prev - 1));
         } else { // Was neutral or liked, now disliking
             setDislikeCount(prev => prev + 1);
-            if (userLikeStatus === 1) {
+            if (currentStatus === 1) { // Was liked
                 setLikeCount(prev => Math.max(0, prev - 1)); // Remove like count too
             }
         }
     }
 
-    // 3. Call Backend Service to RECORD the interaction for the cron job
+    // 3. Call Backend Service to RECORD the interaction
     try {
-      await toggleLikeDislike(videoId, action, currentUser.$id);
+      await toggleLikeDislike(videoId, action, currentUser.$id); // This function remains the same
       console.log(`[VideoDetail] Interaction ${action} recorded successfully for video ${videoId}`);
-      // No state updates needed here, client is already updated
 
     } catch (error) {
       console.error(`Failed to record ${action} interaction:`, error);
       // Revert optimistic LOCAL count updates ONLY if recording fails
       setLikeCount(previousLikeCount);
       setDislikeCount(previousDislikeCount);
-      setLikeError(error.message || `Failed to record ${action}. Your preference is saved locally.`);
-      // DO NOT revert the AuthContext state change.
+      // DO NOT revert the AuthContext state change (the Sets).
+      // Inform user preference is saved locally but counts might be delayed/wrong.
+      setLikeError(error.message || `Failed to sync ${action}. Your preference is saved.`);
+
     } finally {
       setIsLiking(false);
     }
-  }, [currentUser, videoId, isLiking, userLikeStatus, likeCount, dislikeCount, navigate, updateUserLikeDislikeState, setIsLiking, setLikeError, setLikeCount, setDislikeCount]);
+// Add dependencies for the new context values used
+}, [currentUser, videoId, isLiking, likeCount, dislikeCount, likedVideoIds, dislikedVideoIds, navigate, updateClientVideoStates, setIsLiking, setLikeError, setLikeCount, setDislikeCount]);
 
   // Video deletion handler
   const handleDeleteVideo = async () => {
@@ -459,31 +468,13 @@ const VideoDetail = () => {
     fetchAllCounts();
   }, [videoId]); // Re-run when videoId changes
 
-  // --- Effect to derive initial like status from user context ---
-  useEffect(() => {
-    console.log("[VideoDetail Effect] Deriving like status from user context.");
-    if (currentUser && videoId) {
-      // Safely access arrays, default to empty if they don't exist on the user object yet
-      const liked = (currentUser.videosLiked || []).includes(videoId);
-      const disliked = (currentUser.videosDisliked || []).includes(videoId);
-
-      if (liked) {
-        console.log(`[VideoDetail Effect] Video ${videoId} found in currentUser.videosLiked`);
-        setUserLikeStatus(1);
-      } else if (disliked) {
-        console.log(`[VideoDetail Effect] Video ${videoId} found in currentUser.videosDisliked`);
-        setUserLikeStatus(-1);
-      } else {
-        console.log(`[VideoDetail Effect] Video ${videoId} not found in liked/disliked arrays.`);
-        setUserLikeStatus(0);
-      }
-    } else {
-      // Not logged in or videoId not available yet
-      console.log(`[VideoDetail Effect] User not logged in or videoId missing. Setting status to 0.`);
-      setUserLikeStatus(0);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, videoId]); // Rerun when user data or videoId changes
+  // Determine button state directly in render
+  const isLiked = currentUser && likedVideoIds.has(videoId);
+  const isDisliked = currentUser && dislikedVideoIds.has(videoId);
+  // Determine local status for count logic inside handleLikeDislike if needed
+  let localLikeStatus = 0;
+  if (isLiked) localLikeStatus = 1;
+  else if (isDisliked) localLikeStatus = -1;
   
   // --- Realtime updates subscription ---
   useEffect(() => {
@@ -500,38 +491,13 @@ const VideoDetail = () => {
     });
     console.log(`Realtime: Subscribed to ${countsCollection}`);
 
-    // --- Subscribe to User Account (if logged in) ---
-    let userUnsubscribe = null;
-    if (currentUser?.$id) {
-        const accountCollection = `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.accountsCollectionId}.documents.${currentUser.$id}`;
-        userUnsubscribe = client.subscribe(accountCollection, (response) => {
-            console.log("Realtime User Account Update Received:", response.payload);
-            const liked = (response.payload.videosLiked || []).includes(videoId);
-            const disliked = (response.payload.videosDisliked || []).includes(videoId);
-
-            // Update the button state based on the latest arrays from the user document
-            let newStatus = 0;
-            if (liked) newStatus = 1;
-            else if (disliked) newStatus = -1;
-
-            if (newStatus !== userLikeStatus) { // Only update if changed
-                console.log(`Realtime: Updating userLikeStatus from ${userLikeStatus} to ${newStatus}`);
-                setUserLikeStatus(newStatus);
-            }
-        });
-        console.log(`Realtime: Subscribed to ${accountCollection}`);
-    }
-
-    // Cleanup function: Unsubscribe when component unmounts or videoId/currentUser changes
+    // Cleanup function: Unsubscribe when component unmounts or videoId changes
     return () => {
         console.log("Realtime: Unsubscribing from updates...");
         countsUnsubscribe();
-        if (userUnsubscribe) {
-            userUnsubscribe();
-        }
     };
-  // Dependencies ensure re-subscription if videoId or user changes
-  }, [videoId, currentUser, likeCount, dislikeCount, videoCommentCount, userLikeStatus]); // Include states potentially updated by the callback
+  // Dependencies ensure re-subscription if videoId changes
+  }, [videoId, likeCount, dislikeCount, videoCommentCount]); // Include states potentially updated by the callback
   
   // --- Effect to fetch subscriber count ---
   useEffect(() => {
@@ -677,18 +643,11 @@ const VideoDetail = () => {
             <div className="video-actions">
               {/* Like Button */}
               <button
-                className={`video-action-btn like-btn ${currentUser && (currentUser.videosLiked || []).includes(videoId) ? 'active' : ''}`}
-                onClick={() => {
-                  console.log('Like button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
-                  if (typeof handleLikeDislike === 'function') {
-                    handleLikeDislike('like');
-                  } else {
-                    console.error('handleLikeDislike is not a function!', handleLikeDislike);
-                  }
-                }}
+                className={`video-action-btn like-btn ${isLiked ? 'active' : ''}`} // Use isLiked derived from context Set
+                onClick={() => handleLikeDislike('like')} // Ensure correct function call
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={currentUser && (currentUser.videosLiked || []).includes(videoId)}
-                title={currentUser && (currentUser.videosLiked || []).includes(videoId) ? 'Unlike' : 'I like this'}
+                aria-pressed={isLiked}
+                title={isLiked ? 'Unlike' : 'I like this'}
               >
                 <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                   <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>
@@ -699,18 +658,11 @@ const VideoDetail = () => {
 
               {/* Dislike Button */}
               <button
-                className={`video-action-btn dislike-btn ${currentUser && (currentUser.videosDisliked || []).includes(videoId) ? 'active' : ''}`}
-                onClick={() => {
-                  console.log('Dislike button clicked, handleLikeDislike exists?', typeof handleLikeDislike);
-                  if (typeof handleLikeDislike === 'function') {
-                    handleLikeDislike('dislike');
-                  } else {
-                    console.error('handleLikeDislike is not a function!', handleLikeDislike);
-                  }
-                }}
+                className={`video-action-btn dislike-btn ${isDisliked ? 'active' : ''}`} // Use isDisliked derived from context Set
+                onClick={() => handleLikeDislike('dislike')} // Ensure correct function call
                 disabled={isLiking || loadingCounts} // Disable while liking or fetching counts
-                aria-pressed={currentUser && (currentUser.videosDisliked || []).includes(videoId)}
-                title={currentUser && (currentUser.videosDisliked || []).includes(videoId) ? 'Remove dislike' : 'I dislike this'}
+                aria-pressed={isDisliked}
+                title={isDisliked ? 'Remove dislike' : 'I dislike this'}
               >
                  <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
                    <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v1.91l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"></path>

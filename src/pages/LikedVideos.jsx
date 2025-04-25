@@ -7,7 +7,7 @@ import VideoCard from '../components/VideoCard';
 import '../App.css'; // Use shared styles
 
 const LikedVideos = () => {
-  const { user: currentUser, loading: authLoading } = useAuth();
+  const { user: currentUser, loading: authLoading, likedVideoIds } = useAuth(); // Add likedVideoIds
   const [likedVideos, setLikedVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -134,19 +134,18 @@ const LikedVideos = () => {
 
     // Check user status and fetch videos
     if (!authLoading) {
-      if (currentUser && currentUser.videosLiked) {
-        fetchVideoDetails(currentUser.videosLiked);
-      } else if (currentUser && !currentUser.videosLiked) {
-        // User is loaded, but has no 'videosLiked' array (shouldn't happen with current setup, but safe)
-        setLikedVideos([]);
-        setLoading(false);
+      if (currentUser) { // Check only if user exists
+        // --- Use likedVideoIds Set from context ---
+        const idsToFetch = Array.from(likedVideoIds);
+        fetchVideoDetails(idsToFetch);
       } else {
-        // User is not logged in (should be handled by ProtectedRoute)
+        // User is not logged in
         setLoading(false);
-        // No need to set error here, ProtectedRoute handles redirection
+        setLikedVideos([]); // Clear videos if user logs out
       }
     }
-  }, [currentUser, authLoading]); // Re-run when user or auth loading state changes
+// --- Update dependencies ---
+}, [currentUser, authLoading, likedVideoIds]); // Depend on likedVideoIds set
 
   // Render Loading State
   if (loading || authLoading) {

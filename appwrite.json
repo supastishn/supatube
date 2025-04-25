@@ -269,18 +269,18 @@
                 {
                     "key": "videosLiked",
                     "type": "string",
-                    "required": false,
+                    "required": true,
                     "array": true,
                     "size": 255,
-                    "default": ""
+                    "default": []
                 },
                 {
                     "key": "videosDisliked",
                     "type": "string",
-                    "required": false,
+                    "required": true,
                     "array": true,
                     "size": 255,
-                    "default": ""
+                    "default": []
                 }
             ],
             "indexes": []

@@ -5,6 +5,7 @@ import { Query } from 'appwrite'; // Import Query directly from appwrite package
 import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
 import VideoCard from '../components/VideoCard'; // Import VideoCard
 import { useAuth } from '../context/AuthContext'; // Optional: To check if it's the current user's profile
+import { formatViews } from '../utils/formatters'; // Add this line
 
 const Profile = () => {
   const { userId } = useParams(); // Get userId from URL

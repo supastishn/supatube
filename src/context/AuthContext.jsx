@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Register new user
-  const register = async (email, password, name, profileImageUrl) => { // Remove username parameter
+  const register = async (email, password, name) => {
     try {
       // 1. Create the user account
       const newAccount = await account.create(
@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }) => {
             {
               name: name, // Store the provided name
               bio: '', // Initialize bio as empty
-              profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
+              profileImageUrl: null, // Initialize profileImageUrl as null
               videosLiked: [], // Initialize empty array
               videosDisliked: [], // Initialize empty array
               subscribingTo: [] // Initialize empty subscription array

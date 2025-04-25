@@ -73,16 +73,18 @@ export const AuthProvider = ({ children }) => {
       const userId = newAccount.$id;
 
       if (newAccount) {
-        // 2. Attempt to create the corresponding document in 'accounts' collection
+        // 2. Create the corresponding document in 'accounts' collection
+        // Use the new user's ID as the document ID
+        // Use the name and optional profileImageUrl provided during registration
         try {
           await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.accountsCollectionId,
             userId, // Use the new user's ID as the document ID
             {
+              name: name, // Store the provided name
               bio: '', // Initialize bio as empty
               profileImageUrl: profileImageUrl?.trim() || null, // Store provided URL or null
-              name: name, // Store the provided name
               videosLiked: [], // Initialize empty array
               videosDisliked: [], // Initialize empty array
               subscribingTo: [] // Initialize empty subscription array
@@ -90,15 +92,16 @@ export const AuthProvider = ({ children }) => {
             [
               Permission.read(Role.user(userId)), // User can read their own doc
               Permission.update(Role.user(userId)), // User can update their own doc
-              Permission.read(Role.any()) // Make profiles public
+              Permission.read(Role.any()) // Make profiles publically readable
             ]
           );
+          console.log(`[AuthContext] Successfully created account details document for user ${userId}.`);
         } catch (docError) {
           console.error("Failed to create account details document:", docError);
-          // Decide how to handle this - user exists but details doc failed.
+          // Log the error, but proceed to login as the user account itself was created.
           // For now, we proceed to login. The user can update details later.
         }
-
+        
         // Log in the user immediately after registration
         await login(email, password); // login calls checkUserStatus which fetches the new doc
       }

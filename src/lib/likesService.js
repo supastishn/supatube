@@ -2,7 +2,7 @@ import { functions } from './appwriteConfig';
 import { appwriteConfig } from './appwriteConfig';
 
 // IMPORTANT: Ensure this matches the ID in your appwrite.json and Appwrite console
-const LIKES_FUNCTION_ID = 'likes-manager';
+const LIKES_FUNCTION_ID = 'test'; // Route to the 'test' function for now
 
 /**
  * Calls the backend function to toggle like/dislike status for a video.

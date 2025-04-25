@@ -159,7 +159,7 @@ const VideoCard = ({ video, isRelated = false }) => {
           fill: var(--primary); /* Red for liked */
         }
         .video-actions .video-action-btn.dislike-btn.active svg {
-          fill: #606060; /* Dark gray for disliked (example) */
+          fill: var(--primary); /* Red for disliked */
         }
 
         /* Style for disabled state */

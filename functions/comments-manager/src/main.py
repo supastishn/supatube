@@ -72,18 +72,8 @@ def main(context):
             raise ValueError(f"Comment exceeds maximum length of {MAX_COMMENT_LENGTH} characters.")
         context.log(f"Video ID: {video_id}, Parent ID: {parent_comment_id}, Text: '{comment_text[:50]}...'")
 
-        # 3. Validate Parent ID (Ensure it's a top-level comment)
-        if parent_comment_id:
-            is_top_level_parent = False
-            for top_comment in comments_list: # comments_list holds only top-level comments initially
-                if top_comment.get('commentId') == parent_comment_id:
-                    is_top_level_parent = True
-                    break # Found the top-level parent
-
-            if not is_top_level_parent:
-                context.log(f"Error: Attempt to reply to a non-top-level comment or invalid parent ID: {parent_comment_id}")
-                return context.res.json({"success": "false", "message": "Replying to replies is not allowed."}, 400)
-            context.log(f"Parent ID {parent_comment_id} confirmed as top-level.")
+        # 3. Validate Parent ID (Ensure it's a top-level comment) - This will be checked later after loading comments_list
+        has_parent_comment_id = bool(parent_comment_id)
 
     except Exception as e:
         return context.res.json({"success": "false", "message": f"Invalid request: {e}"}, 400)
@@ -114,6 +104,12 @@ def main(context):
         current_dislike_count = 0   # Needed for create document
         create_counts_doc = False
         counts_doc = None
+        
+        # Now validate parent comment ID if one was provided
+        if has_parent_comment_id:
+            is_top_level_parent = False
+            # This check will happen after loading comments_list
+        
         try:
             context.log(f"Fetching video_counts document for video {video_id}...")
             counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
@@ -134,9 +130,27 @@ def main(context):
                     context.log("Warning: commentsJson was not a list, resetting to empty.")
                     comments_list = []
                 context.log(f"Parsed {len(comments_list)} existing comments. Current count: {current_comment_count}")
+                
+                # Now that comments_list is loaded, validate parent_comment_id if needed
+                if has_parent_comment_id:
+                    is_top_level_parent = False
+                    for top_comment in comments_list:
+                        if top_comment.get('commentId') == parent_comment_id:
+                            is_top_level_parent = True
+                            break # Found the top-level parent
+
+                    if not is_top_level_parent:
+                        context.log(f"Error: Attempt to reply to a non-top-level comment or invalid parent ID: {parent_comment_id}")
+                        return context.res.json({"success": "false", "message": "Replying to replies is not allowed."}, 400)
+                    context.log(f"Parent ID {parent_comment_id} confirmed as top-level.")
             except json.JSONDecodeError:
                 context.log("Warning: Failed to parse commentsJson, resetting to empty.")
                 comments_list = []
+                
+                # If we had a parent_comment_id but couldn't load comments, it can't be valid
+                if has_parent_comment_id:
+                    context.log(f"Error: Can't validate parent comment ID {parent_comment_id} with empty comments list")
+                    return context.res.json({"success": "false", "message": "Invalid parent comment ID."}, 400)
         except AppwriteException as e:
             if e.code == 404:
                 context.log(f"No video_counts document found for {video_id}. Will create.")

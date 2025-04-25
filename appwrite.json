@@ -250,6 +250,24 @@
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/subscriptions-manager"
+        },
+        {
+            "$id": "video-deletion-manager",
+            "execute": [],
+            "name": "video-deletion-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "users.read"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/video-deletion-manager"
         }
     ],
     "databases": [
@@ -404,6 +422,22 @@
                     "required": true,
                     "array": true,
                     "size": 999999,
+                    "default": null
+                },
+                {
+                    "key": "commentsJson",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1,
+                    "default": null
+                },
+                {
+                    "key": "commentCount",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1,
                     "default": null
                 }
             ],

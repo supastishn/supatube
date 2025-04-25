@@ -194,7 +194,7 @@ def main(context):
             context.error(f"Failed to update account document for user {user_id}: {e}")
             # If updating the arrays fails, we should probably stop and report error
             # The error message below matches the traceback seen previously
-            raise Exception(f"Failed to save updated like/dislike status: {e.message}")
+            raise Exception(f"Failed to save updated like/dislike status. Message: {e.message}. Error: {e}")
 
         # 6. Update counts on the 'video_counts' collection (same logic as before)
         if like_change != 0 or dislike_change != 0:

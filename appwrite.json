@@ -321,7 +321,7 @@
                 { "key": "duration", "type": "integer", "required": true, "min": 0, "array": false },
                 { "key": "uncompressedFileId", "type": "string", "required": true, "size": 100, "array": false },
                 { "key": "thumbnailId", "type": "string", "required": true, "size": 100, "array": false },
-                { "key": "status", "type": "string", "required": true, "size": 15, "default": "pending", "array": false },
+                { "key": "status", "type": "string", "required": false, "size": 15, "default": "pending", "array": false },
                 { "key": "errorMessage", "type": "string", "required": false, "size": 500, "array": false }
             ],
             "indexes": [
@@ -703,9 +703,9 @@
         {
             "$id": "videos",
             "$permissions": [
-                "create(\"users\")",
-                "read(\"users\")",
-                "read(\"guests\")"
+
+                "read(\"any\")"
+
             ],
             "fileSecurity": true,
             "name": "videos",

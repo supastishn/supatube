@@ -16,6 +16,48 @@ VIDEO_COUNTS_COLLECTION_ID = "video_counts"
 COMMENTS_INTERACTIONS_COLLECTION_ID = "comments-interactions"
 MAX_COMMENT_LENGTH = 2000
 
+# --- NEW: Helper function to recursively delete a comment and its replies ---
+def delete_comment_recursive(comments_list, comment_id_to_delete, requesting_user_id, context):
+    """
+    Finds and removes a comment and its replies from a list.
+    Returns: A tuple (list_modified, deleted_count)
+             list_modified: Boolean indicating if the list was changed.
+             deleted_count: Integer count of the comment + its replies removed.
+    """
+    initial_length = len(comments_list)
+    
+    item_to_remove = None
+    for i, comment in enumerate(comments_list):
+        comment_owner_id = comment.get('userId')
+        
+        if comment.get('commentId') == comment_id_to_delete:
+            # --- Authorization Check ---
+            if comment_owner_id != requesting_user_id:
+                context.error(f"Authorization failed: User {requesting_user_id} cannot delete comment {comment_id_to_delete} owned by {comment_owner_id}.")
+                return False, 0 # Indicate no modification, 0 deleted
+            
+            # Found the comment to delete
+            item_to_remove = comment
+            del comments_list[i]
+            
+            # Count the deleted comment + its replies
+            replies_count = len(item_to_remove.get('replies', []))
+            deleted_count = 1 + replies_count
+            context.log(f"Marked comment {comment_id_to_delete} for deletion (owner: {comment_owner_id}). Deleted count: {deleted_count}")
+            return True, deleted_count # List modified, return count
+
+        # Recursively search in replies if it's a list
+        replies = comment.get('replies', [])
+        if isinstance(replies, list) and replies:
+            modified, count = delete_comment_recursive(replies, comment_id_to_delete, requesting_user_id, context)
+            if modified:
+                # If a reply was deleted, update the parent comment's replies list
+                comment['replies'] = replies # Not strictly necessary if list is modified in-place, but good practice
+                return True, count # Bubble up the result
+
+    return False, 0 # Not found in this list or its children
+
+
 # Helper function to find and add a reply recursively
 def add_reply(comments, parent_id, new_reply):
     for comment in comments:
@@ -81,8 +123,8 @@ def main(context):
                 parent_comment_id = interaction_doc.get('parentCommentId')
                 temporary_client_id = interaction_doc.get('temporaryClientId')
 
-                if not video_id or not comment_text:
-                    context.error(f"Missing videoId or commentText in interaction {interaction_id}. Skipping.")
+                if not video_id:
+                    context.error(f"Missing videoId in interaction {interaction_id}. Skipping.")
                     failed_count += 1
                     continue
 
@@ -242,7 +284,77 @@ def main(context):
                     )
                     context.log(f"Updated video_counts document for {video_id}.")
 
-                # --- Delete Interaction Document ---
+                        
+                elif interaction_type == 'delete':
+                    # --- DELETE LOGIC ---
+                    context.log(f"Processing DELETE interaction {interaction_id}")
+                    
+                    comment_id_to_delete = interaction_doc.get('commentIdToDelete')
+
+                    if not comment_id_to_delete:
+                        context.error(f"Missing commentIdToDelete in DELETE interaction {interaction_id}. Skipping.")
+                        failed_count += 1
+                        continue
+                    
+                    # --- Fetch Video Counts Document ---
+                    comments_list = []
+                    current_comment_count = 0
+                    
+                    try:
+                        counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
+                        comments_json_string = counts_doc.get('commentsJson') or '[]'
+                        current_comment_count = counts_doc.get('commentCount', 0) or 0
+
+                        try:
+                            comments_list = json.loads(comments_json_string)
+                            if not isinstance(comments_list, list):
+                                context.log(f"Warning: commentsJson for video {video_id} is not a list during delete. Skipping.")
+                                failed_count += 1
+                                continue
+                        except json.JSONDecodeError:
+                            context.log(f"Warning: Failed to parse commentsJson for video {video_id} during delete. Skipping.")
+                            failed_count += 1
+                            continue
+                            
+                    except AppwriteException as e:
+                        if e.code == 404:
+                            context.log(f"No video_counts document found for {video_id} during delete. Cannot delete comment {comment_id_to_delete}. Skipping.")
+                            failed_count += 1
+                            continue
+                        else:
+                            context.error(f"Error fetching video_counts doc for {video_id} during delete: {e}. Skipping.")
+                            failed_count += 1
+                            continue
+                            
+                    # --- Find and Remove Comment (with Auth Check) ---
+                    modified, deleted_count = delete_comment_recursive(comments_list, comment_id_to_delete, user_id, context)
+
+                    if not modified:
+                        context.log(f"Comment {comment_id_to_delete} not found or user {user_id} not authorized. Skipping update for interaction {interaction_id}.")
+                        # Don't increment failed_count here, could be legitimate (already deleted) or auth failure
+                    else:
+                        # --- Update Video Counts Document ---
+                        new_comment_count = max(0, current_comment_count - deleted_count)
+                        updated_comments_json = json.dumps(comments_list)
+                        
+                        context.log(f"Updating video_counts document for {video_id} after deletion...")
+                        databases.update_document(
+                            database_id=DATABASE_ID,
+                            collection_id=VIDEO_COUNTS_COLLECTION_ID,
+                            document_id=video_id,
+                            data={ # Only update comment fields
+                                "commentsJson": updated_comments_json,
+                                "commentCount": new_comment_count
+                            }
+                        )
+                        context.log(f"Updated video_counts document for {video_id}. New count: {new_comment_count}")
+                
+                else:
+                    context.error(f"Unknown interaction type '{interaction_type}' for interaction {interaction_id}. Skipping.")
+                    failed_count += 1
+                    continue
+                    
+                # --- Delete Interaction Document (Common for successful create/delete) ---
                 context.log(f"Deleting interaction document {interaction_id}...")
                 databases.delete_document(
                     DATABASE_ID,

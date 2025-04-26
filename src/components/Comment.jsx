@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { postComment } from '../lib/commentService';
+import { postComment, deleteCommentInteraction } from '../lib/commentService'; // Import delete function
 import { 
   createTempComment,
   addPendingComment
@@ -24,6 +24,8 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isPostingReply, setIsPostingReply] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false); // State for deletion loading
+  const [isLocallyDeleted, setIsLocallyDeleted] = useState(false); // State for optimistic deletion
   const [replyError, setReplyError] = useState('');
 
   const handlePostReply = async (e) => {
@@ -79,6 +81,35 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
       setIsPostingReply(false);
     }
   };
+  
+  // --- Handler for Deleting Comment ---
+  const handleDeleteComment = async () => {
+    if (!currentUser || currentUser.$id !== comment.userId || isDeleting) {
+      console.warn("Attempted delete by non-owner or already deleting.");
+      return;
+    }
+    
+    const confirmDelete = window.confirm("Are you sure you want to delete this comment?");
+    if (!confirmDelete) return;
+    
+    setIsDeleting(true);
+    setReplyError(''); // Clear any previous errors
+    
+    // Optimistic UI update: Hide the comment immediately
+    setIsLocallyDeleted(true); 
+    
+    try {
+      await deleteCommentInteraction(videoId, comment.commentId, currentUser.$id);
+      console.log(`[Comment] Delete interaction posted for comment ${comment.commentId}`);
+      // Note: Actual removal from state happens when video_counts updates via realtime/refresh
+    } catch (error) {
+      console.error("Failed to post delete interaction:", error);
+      setReplyError("Could not delete comment. Please try again.");
+      setIsLocallyDeleted(false); // Rollback optimistic hide on error
+      setIsDeleting(false); // Ensure button is re-enabled
+    } 
+    // No finally needed to set isDeleting=false here, as the component might unmount
+  };
   const {
     commentId,
     userId,
@@ -91,6 +122,11 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
   } = comment;
 
   // TODO: Add state and handler for showing/posting replies in Phase 2
+
+  // --- Optimistic Deletion Check ---
+  if (isLocallyDeleted) {
+    return null; // Don't render if optimistically deleted
+  }
 
   return (
     <div className={`comment-item ${pending ? 'pending' : ''}`} id={`comment-${commentId}`}>
@@ -113,10 +149,20 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
         <p className="comment-text">{commentText}</p>
         {/* Comment Actions */}
         <div className="comment-actions">
-          {currentUser && depth === 0 && ( // Only show reply button if logged in and top-level comment
+          {currentUser && !pending && depth === 0 && ( // Only show reply button if logged in, not pending, and top-level comment
             <button className="reply-button" onClick={() => setShowReplyInput(!showReplyInput)}>
               Reply
             </button>
+          )}
+          {/* --- Delete Button (Owner Only) --- */}
+          {currentUser && !pending && currentUser.$id === userId && (
+             <button 
+                className="delete-button" 
+                onClick={handleDeleteComment}
+                disabled={isDeleting}
+             >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+             </button>
           )}
         </div>
 
@@ -222,6 +268,15 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
           }
           .reply-button:hover {
             color: var(--text);
+          }
+          /* Delete button style */
+          .delete-button {
+             font-size: 12px;
+             font-weight: 500;
+             color: var(--text-secondary);
+             padding: 6px 8px; /* Adjust padding */
+             margin-left: 8px; /* Space between reply and delete */
+             border-radius: 18px; /* Consistent rounding */
           }
 
           .reply-form {

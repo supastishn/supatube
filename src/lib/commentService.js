@@ -63,6 +63,58 @@ export const postComment = async (videoId, commentText, parentCommentId = null, 
 };
 
 /**
+ * Posts a 'delete' interaction for a specific comment.
+ * @param {string} videoId - The ID of the video the comment belongs to.
+ * @param {string} commentIdToDelete - The ID of the comment to be deleted.
+ * @param {string} userId - ID of the user requesting the deletion.
+ * @returns {Promise<{success: boolean}>} - Confirmation of recording.
+ */
+export const deleteCommentInteraction = async (videoId, commentIdToDelete, userId) => {
+  console.log(`[commentService] Posting delete interaction. Video: ${videoId}, Comment: ${commentIdToDelete}`);
+
+  if (!userId) {
+    throw new Error("User ID is required to delete a comment interaction.");
+  }
+  if (!videoId || !commentIdToDelete) {
+    throw new Error("Video ID and Comment ID to delete are required.");
+  }
+
+  try {
+    // Data for the delete interaction document
+    const interactionData = {
+      videoId,
+      type: 'delete', // Explicitly set type to delete
+      commentIdToDelete,
+      commentText: '', // Not needed for delete, send empty or null
+      temporaryClientId: `delete-${commentIdToDelete}-${Date.now()}` // Unique identifier for this delete request
+    };
+
+    // Permissions: Creator can manage their own delete request
+    const docPermissions = [
+      Permission.read(Role.user(userId)),
+      Permission.update(Role.user(userId)),
+      Permission.delete(Role.user(userId))
+    ];
+
+    // Create the interaction document
+    const response = await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.commentsInteractionsCollectionId,
+      ID.unique(),
+      interactionData,
+      docPermissions
+    );
+
+    console.log(`[commentService] Delete interaction document created: ${response.$id}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('[commentService] Error posting delete comment interaction:', error);
+    throw error; // Re-throw the error
+  }
+};
+
+/**
  * Fetches the comments JSON for a video.
  * NOTE: This fetches ALL comments at once. Client-side parsing/sorting needed.
  * @param {string} videoId

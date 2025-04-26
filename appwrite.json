@@ -285,6 +285,21 @@
                     "required": true,
                     "size": 100,
                     "array": false
+                },
+                {
+                    "key": "type",
+                    "type": "string",
+                    "required": true,
+                    "size": 10,
+                    "default": "create",
+                    "array": false
+                },
+                {
+                    "key": "commentIdToDelete",
+                    "type": "string",
+                    "required": false,
+                    "size": 100,
+                    "array": false
                 }
             ],
             "indexes": []

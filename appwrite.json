@@ -718,7 +718,8 @@
         {
              "$id": "videos-uncompressed",
             "$permissions": [
-                "create(\"users\")"
+                "create(\"users\")",
+                "read(\"any\")"
             ],
             "fileSecurity": true,
             "name": "Videos Uncompressed",

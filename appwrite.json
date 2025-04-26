@@ -113,7 +113,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 900,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt && \\\napk update && apk add --no-cache curl bash && \\\nFFMPEG_SCRIPT_URL='https://raw.githubusercontent.com/eugeneware/ffmpeg-static/refs/heads/master/download-binaries/index.sh' && \\\ncurl -L ${FFMPEG_SCRIPT_URL} -o /tmp/download_ffmpeg.sh && \\\nchmod +x /tmp/download_ffmpeg.sh && \\\n/tmp/download_ffmpeg.sh && \\\nrm /tmp/download_ffmpeg.sh",
+            "commands": "pip install -r requirements.txt\napk update \napk add --no-cache curl bash\ncurl -L https://raw.githubusercontent.com/eugeneware/ffmpeg-static/refs/heads/master/download-binaries/index.sh -o /tmp/download_ffmpeg.sh\nchmod +x /tmp/download_ffmpeg.sh \n/tmp/download_ffmpeg.sh\nrm /tmp/download_ffmpeg.sh",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-manager"
         },
@@ -316,21 +316,69 @@
             "enabled": true,
             "documentSecurity": true,
             "attributes": [
-                { "key": "title", "type": "string", "required": true, "size": 100, "array": false },
-                { "key": "description", "type": "string", "required": false, "size": 1000, "array": false },
-                { "key": "duration", "type": "integer", "required": false, "min": 0, "array": false, "default": null },
-                { "key": "uncompressedFileId", "type": "string", "required": true, "size": 100, "array": false },
-                { "key": "thumbnailId", "type": "string", "required": true, "size": 100, "array": false },
-                { "key": "status", "type": "string", "required": false, "size": 15, "default": "pending", "array": false },
-                { "key": "errorMessage", "type": "string", "required": false, "size": 500, "array": false }
+                {
+                    "key": "title",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "description",
+                    "type": "string",
+                    "required": false,
+                    "size": 1000,
+                    "array": false
+                },
+                {
+                    "key": "duration",
+                    "type": "integer",
+                    "required": false,
+                    "min": 0,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "uncompressedFileId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "thumbnailId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "string",
+                    "required": false,
+                    "size": 15,
+                    "default": "pending",
+                    "array": false
+                },
+                {
+                    "key": "errorMessage",
+                    "type": "string",
+                    "required": false,
+                    "size": 500,
+                    "array": false
+                }
             ],
             "indexes": [
                 {
                     "key": "status_index",
                     "type": "key",
                     "status": "available",
-                    "attributes": ["status"],
-                    "orders": ["ASC"]
+                    "attributes": [
+                        "status"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ]
                 }
             ]
         },
@@ -371,15 +419,25 @@
                     "key": "userId_videoId",
                     "type": "key",
                     "status": "available",
-                    "attributes": ["userId", "videoId"],
-                    "orders": ["ASC", "ASC"]
+                    "attributes": [
+                        "userId",
+                        "videoId"
+                    ],
+                    "orders": [
+                        "ASC",
+                        "ASC"
+                    ]
                 },
                 {
                     "key": "userId",
                     "type": "key",
                     "status": "available",
-                    "attributes": ["userId"],
-                    "orders": ["ASC"]
+                    "attributes": [
+                        "userId"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ]
                 }
             ]
         },
@@ -702,9 +760,7 @@
         {
             "$id": "videos",
             "$permissions": [
-
                 "read(\"any\")"
-
             ],
             "fileSecurity": true,
             "name": "videos",
@@ -716,7 +772,7 @@
             "antivirus": true
         },
         {
-             "$id": "videos-uncompressed",
+            "$id": "videos-uncompressed",
             "$permissions": [
                 "create(\"users\")",
                 "read(\"any\")"

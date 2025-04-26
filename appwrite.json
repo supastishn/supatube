@@ -113,7 +113,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 900,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt && \\\napk update && apk add --no-cache curl tar xz && \\\nFFMPEG_URL='https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz' && \\\ncurl -L ${FFMPEG_URL} -o /tmp/ffmpeg.tar.xz && \\\nmkdir /tmp/ffmpeg-static && \\\ntar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-static --strip-components=1 && \\\nmv /tmp/ffmpeg-static/ffmpeg /usr/local/bin/ && \\\nmv /tmp/ffmpeg-static/ffprobe /usr/local/bin/ && \\\nrm /tmp/ffmpeg.tar.xz && rm -rf /tmp/ffmpeg-static",
+            "commands": "pip install -r requirements.txt && \\\napk update && apk add --no-cache curl bash && \\\nFFMPEG_SCRIPT_URL='https://raw.githubusercontent.com/eugeneware/ffmpeg-static/refs/heads/master/download-binaries/index.sh' && \\\ncurl -L ${FFMPEG_SCRIPT_URL} -o /tmp/download_ffmpeg.sh && \\\nchmod +x /tmp/download_ffmpeg.sh && \\\n/tmp/download_ffmpeg.sh && \\\nrm /tmp/download_ffmpeg.sh",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-manager"
         },

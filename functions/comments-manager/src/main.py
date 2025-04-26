@@ -19,43 +19,56 @@ MAX_COMMENT_LENGTH = 2000
 # --- NEW: Helper function to recursively delete a comment and its replies ---
 def delete_comment_recursive(comments_list, comment_id_to_delete, requesting_user_id, context):
     """
-    Finds and removes a comment and its replies from a list.
-    Returns: A tuple (list_modified, deleted_count)
-             list_modified: Boolean indicating if the list was changed.
-             deleted_count: Integer count of the comment + its replies removed.
+    Recursively filters a list of comments, removing the specified comment and its replies.
+    Returns: A tuple (filtered_list, deleted_count)
+             filtered_list: A NEW list containing only the comments that should remain.
+             deleted_count: Integer count of the comments + replies removed.
     """
-    initial_length = len(comments_list)
-    
-    item_to_remove = None
-    for i, comment in enumerate(comments_list):
+    filtered_list = []
+    total_deleted_count = 0
+
+    if not isinstance(comments_list, list):
+        context.log(f"Warning: Expected list for deletion, got {type(comments_list)}. Returning empty.")
+        return [], 0
+
+    for comment in comments_list:
         comment_owner_id = comment.get('userId')
-        
-        if comment.get('commentId') == comment_id_to_delete:
+        current_comment_id = comment.get('commentId')
+        replies = comment.get('replies', [])
+
+        if current_comment_id == comment_id_to_delete:
             # --- Authorization Check ---
             if comment_owner_id != requesting_user_id:
-                context.error(f"Authorization failed: User {requesting_user_id} cannot delete comment {comment_id_to_delete} owned by {comment_owner_id}.")
-                return False, 0 # Indicate no modification, 0 deleted
-            
-            # Found the comment to delete
-            item_to_remove = comment
-            del comments_list[i]
-            
-            # Count the deleted comment + its replies
-            replies_count = len(item_to_remove.get('replies', []))
-            deleted_count = 1 + replies_count
-            context.log(f"Marked comment {comment_id_to_delete} for deletion (owner: {comment_owner_id}). Deleted count: {deleted_count}")
-            return True, deleted_count # List modified, return count
+                context.error(f"Authorization failed: User {requesting_user_id} cannot delete comment {comment_id_to_delete} owned by {comment_owner_id}. Keeping comment.")
+                filtered_list.append(comment) # Keep the comment if unauthorized
+            else:
+                # Found the comment to delete, DO NOT add it to filtered_list
+                # Count the deleted comment + its replies
+                replies_count = len(replies) if isinstance(replies, list) else 0
+                deleted_count = 1 + replies_count
+                total_deleted_count += deleted_count
+                context.log(f"Comment {comment_id_to_delete} owned by {comment_owner_id} identified for deletion. Deleted count for this branch: {deleted_count}")
+            # Continue to the next comment in the original list
+            continue
 
-        # Recursively search in replies if it's a list
-        replies = comment.get('replies', [])
+        # If not the comment to delete, process its replies recursively
         if isinstance(replies, list) and replies:
-            modified, count = delete_comment_recursive(replies, comment_id_to_delete, requesting_user_id, context)
-            if modified:
-                # If a reply was deleted, update the parent comment's replies list
-                comment['replies'] = replies # Not strictly necessary if list is modified in-place, but good practice
-                return True, count # Bubble up the result
+            # Create a copy to avoid modifying the original while iterating
+            comment_copy = comment.copy()
+            # Recursively filter the replies
+            filtered_replies, replies_deleted_count = delete_comment_recursive(replies, comment_id_to_delete, requesting_user_id, context)
+            # Update the copy's replies with the filtered list
+            comment_copy['replies'] = filtered_replies
+            # Add the potentially modified comment copy to the result list
+            filtered_list.append(comment_copy)
+            # Accumulate the count of deleted replies
+            total_deleted_count += replies_deleted_count
+        else:
+            # No replies or not a list, keep the comment as is
+            filtered_list.append(comment)
 
-    return False, 0 # Not found in this list or its children
+    # Return the newly constructed list and the total count of deleted items
+    return filtered_list, total_deleted_count
 
 
 # Helper function to find and add a reply recursively
@@ -369,15 +382,16 @@ def main(context):
                         failed_count += 1
                         continue
                 # --- Find and Remove Comment (with Auth Check) ---
-                modified, deleted_count = delete_comment_recursive(comments_list, comment_id_to_delete, user_id, context)
+                # Call the refactored function - it returns the new list and count
+                new_comments_list, deleted_count = delete_comment_recursive(comments_list, comment_id_to_delete, user_id, context)
 
-                if not modified:
+                if deleted_count == 0: # Check if any comments were actually deleted (implies found and authorized)
                     context.log(f"Comment {comment_id_to_delete} not found or user {user_id} not authorized. Skipping update for interaction {interaction_id}.")
                     # Don't increment failed_count here, could be legitimate (already deleted) or auth failure
                 else:
                     # --- Update Video Counts Document ---
                     new_comment_count = max(0, current_comment_count - deleted_count)
-                    updated_comments_json = json.dumps(comments_list)
+                    updated_comments_json = json.dumps(new_comments_list) # Use the NEW list returned by the function
                     
                     context.log(f"Updating video_counts document for {video_id} after deletion...")
                     databases.update_document(

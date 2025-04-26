@@ -115,13 +115,11 @@ def main(context):
         for interaction_doc in interactions:
             try:
                 interaction_id = interaction_doc["$id"]
-                context.log(f"Processing comment interaction {interaction_id}...")
+                context.log(f"Processing interaction {interaction_id}...")
 
-                # --- Extract Data from Interaction ---
+                # --- Extract Common Data ---
                 video_id = interaction_doc.get('videoId')
-                comment_text = interaction_doc.get('commentText', '').strip()
-                parent_comment_id = interaction_doc.get('parentCommentId')
-                temporary_client_id = interaction_doc.get('temporaryClientId')
+                interaction_type = interaction_doc.get('type', 'create') # Default to 'create' if missing
 
                 if not video_id:
                     context.error(f"Missing videoId in interaction {interaction_id}. Skipping.")

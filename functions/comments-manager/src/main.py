@@ -281,89 +281,123 @@ def main(context):
                         }
                     )
                     context.log(f"Updated video_counts document for {video_id}.")
-            
-            elif interaction_type == 'delete':
-                    # --- DELETE LOGIC ---
-                    context.log(f"Processing DELETE interaction {interaction_id}")
-                    
-                    comment_id_to_delete = interaction_doc.get('commentIdToDelete')
-
-                    if not comment_id_to_delete:
-                        context.error(f"Missing commentIdToDelete in DELETE interaction {interaction_id}. Skipping.")
-                        failed_count += 1
-                        continue
-                    
-                    # --- Fetch Video Counts Document ---
-                    comments_list = []
-                    current_comment_count = 0
-                    
-                    try:
-                        counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
-                        comments_json_string = counts_doc.get('commentsJson') or '[]'
-                        current_comment_count = counts_doc.get('commentCount', 0) or 0
-
-                        try:
-                            comments_list = json.loads(comments_json_string)
-                            if not isinstance(comments_list, list):
-                                context.log(f"Warning: commentsJson for video {video_id} is not a list during delete. Skipping.")
-                                failed_count += 1
-                                continue
-                        except json.JSONDecodeError:
-                            context.log(f"Warning: Failed to parse commentsJson for video {video_id} during delete. Skipping.")
-                            failed_count += 1
-                            continue
-                            
-                    except AppwriteException as e:
-                        if e.code == 404:
-                            context.log(f"No video_counts document found for {video_id} during delete. Cannot delete comment {comment_id_to_delete}. Skipping.")
-                            failed_count += 1
-                            continue
-                        else:
-                            context.error(f"Error fetching video_counts doc for {video_id} during delete: {e}. Skipping.")
-                            failed_count += 1
-                            continue
-                            
-                    # --- Find and Remove Comment (with Auth Check) ---
-                    modified, deleted_count = delete_comment_recursive(comments_list, comment_id_to_delete, user_id, context)
-
-                    if not modified:
-                        context.log(f"Comment {comment_id_to_delete} not found or user {user_id} not authorized. Skipping update for interaction {interaction_id}.")
-                        # Don't increment failed_count here, could be legitimate (already deleted) or auth failure
-                    else:
-                        # --- Update Video Counts Document ---
-                        new_comment_count = max(0, current_comment_count - deleted_count)
-                        updated_comments_json = json.dumps(comments_list)
-                        
-                        context.log(f"Updating video_counts document for {video_id} after deletion...")
-                        databases.update_document(
-                            database_id=DATABASE_ID,
-                            collection_id=VIDEO_COUNTS_COLLECTION_ID,
-                            document_id=video_id,
-                            data={ # Only update comment fields
-                                "commentsJson": updated_comments_json,
-                                "commentCount": new_comment_count
-                            }
-                        )
-                        context.log(f"Updated video_counts document for {video_id}. New count: {new_comment_count}")
                 
-        else:
-            context.error(f"Unknown interaction type '{interaction_type}' for interaction {interaction_id}. Skipping.")
-            failed_count += 1
-            continue
-                    
-            # --- Delete Interaction Document (Common for successful create/delete) ---
-            context.log(f"Deleting interaction document {interaction_id}...")
-            databases.delete_document(
-                DATABASE_ID,
-                COMMENTS_INTERACTIONS_COLLECTION_ID,
-                interaction_id
-            )
-            context.log(f"Deleted interaction document {interaction_id}.")
-            
-            processed_count += 1
+                # --- Delete Interaction Document (Common for successful create/delete) ---
+                context.log(f"Deleting interaction document {interaction_id}...")
+                databases.delete_document(
+                    DATABASE_ID,
+                    COMMENTS_INTERACTIONS_COLLECTION_ID,
+                    interaction_id
+                )
+                context.log(f"Deleted interaction document {interaction_id}.")
+                
+                processed_count += 1
 
             except Exception as e:
                 context.error(f"Error processing interaction {interaction_doc.get('$id', 'unknown')}: {e}")
+                failed_count += 1
+            
+        # Process DELETE interactions
+        for interaction_doc in interactions:
+            try:
+                interaction_id = interaction_doc["$id"]
+                interaction_type = interaction_doc.get('type', 'create')
+                video_id = interaction_doc.get('videoId')
+                
+                # Skip if not a delete interaction
+                if interaction_type != 'delete':
+                    continue
+                    
+                context.log(f"Processing DELETE interaction {interaction_id}")
+                
+                # --- Extract data ---
+                user_id = None
+                doc_permissions = interaction_doc.get('$permissions', [])
+                update_permission_prefix = 'update("user:'
+                for perm in doc_permissions:
+                    if perm.startswith(update_permission_prefix):
+                        start_index = len(update_permission_prefix)
+                        end_index = perm.find('")', start_index)
+                        if end_index != -1:
+                            user_id = perm[start_index:end_index]
+                            break
+                            
+                if not user_id:
+                    context.error(f"Could not determine user ID from permissions on interaction doc {interaction_id}.")
+                    failed_count += 1
+                    continue
+                
+                comment_id_to_delete = interaction_doc.get('commentIdToDelete')
+
+                if not comment_id_to_delete:
+                    context.error(f"Missing commentIdToDelete in DELETE interaction {interaction_id}. Skipping.")
+                    failed_count += 1
+                    continue
+                # --- Fetch Video Counts Document ---
+                comments_list = []
+                current_comment_count = 0
+                
+                try:
+                    counts_doc = databases.get_document(DATABASE_ID, VIDEO_COUNTS_COLLECTION_ID, video_id)
+                    comments_json_string = counts_doc.get('commentsJson') or '[]'
+                    current_comment_count = counts_doc.get('commentCount', 0) or 0
+
+                    try:
+                        comments_list = json.loads(comments_json_string)
+                        if not isinstance(comments_list, list):
+                            context.log(f"Warning: commentsJson for video {video_id} is not a list during delete. Skipping.")
+                            failed_count += 1
+                            continue
+                    except json.JSONDecodeError:
+                        context.log(f"Warning: Failed to parse commentsJson for video {video_id} during delete. Skipping.")
+                        failed_count += 1
+                        continue
+                        
+                except AppwriteException as e:
+                    if e.code == 404:
+                        context.log(f"No video_counts document found for {video_id} during delete. Cannot delete comment {comment_id_to_delete}. Skipping.")
+                        failed_count += 1
+                        continue
+                    else:
+                        context.error(f"Error fetching video_counts doc for {video_id} during delete: {e}. Skipping.")
+                        failed_count += 1
+                        continue
+                # --- Find and Remove Comment (with Auth Check) ---
+                modified, deleted_count = delete_comment_recursive(comments_list, comment_id_to_delete, user_id, context)
+
+                if not modified:
+                    context.log(f"Comment {comment_id_to_delete} not found or user {user_id} not authorized. Skipping update for interaction {interaction_id}.")
+                    # Don't increment failed_count here, could be legitimate (already deleted) or auth failure
+                else:
+                    # --- Update Video Counts Document ---
+                    new_comment_count = max(0, current_comment_count - deleted_count)
+                    updated_comments_json = json.dumps(comments_list)
+                    
+                    context.log(f"Updating video_counts document for {video_id} after deletion...")
+                    databases.update_document(
+                        database_id=DATABASE_ID,
+                        collection_id=VIDEO_COUNTS_COLLECTION_ID,
+                        document_id=video_id,
+                        data={ # Only update comment fields
+                            "commentsJson": updated_comments_json,
+                            "commentCount": new_comment_count
+                        }
+                    )
+                    context.log(f"Updated video_counts document for {video_id}. New count: {new_comment_count}")
+                    
+                    # --- Delete Interaction Document ---
+                    context.log(f"Deleting interaction document {interaction_id}...")
+                    databases.delete_document(
+                        DATABASE_ID,
+                        COMMENTS_INTERACTIONS_COLLECTION_ID,
+                        interaction_id
+                    )
+                    context.log(f"Deleted interaction document {interaction_id}.")
+                    
+                    processed_count += 1
+                    
+            except Exception as e:
+                context.error(f"Error processing delete interaction {interaction_doc.get('$id', 'unknown')}: {e}")
                 failed_count += 1
 
         # --- Summary ---

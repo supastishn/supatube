@@ -874,7 +874,9 @@ const VideoDetail = () => {
             <p>No comments yet. Be the first!</p>
           ) : (
             <div className="comments-list">
-              {comments.map(comment => (
+              {comments
+                .filter(comment => comment.commentText && comment.commentText.trim() !== "") // Filter out empty comments
+                .map(comment => (
                 <Comment 
                   key={comment.commentId} 
                   comment={comment}

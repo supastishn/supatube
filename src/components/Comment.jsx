@@ -193,7 +193,9 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
         {/* Render Replies Recursively (if any) */}
         {replies.length > 0 && (
           <div className="comment-replies" style={{ marginLeft: depth === 0 ? '52px' : '0' }}>
-            {replies.map(reply => (
+            {replies
+              .filter(reply => reply.commentText && reply.commentText.trim() !== "") // Filter out empty replies
+              .map(reply => (
               <Comment
                 key={reply.commentId}
                 comment={reply}

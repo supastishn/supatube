@@ -224,8 +224,7 @@ def main(context):
                 # Cleanup temporary files
                 if input_file_path and os.path.exists(input_file_path): os.remove(input_file_path)
                 if output_file_path and os.path.exists(output_file_path): os.remove(output_file_path)
-                if thumbnail_input_path and os.path.exists(thumbnail_input_path): os.remove(thumbnail_input_path)
-                if thumbnail_input_path and os.path.exists(thumbnail_input_path): os.remove(thumbnail_input_path)
+                # thumbnail_input_path doesn't exist at this point in the code
                 continue # Move to next document
 
             # --- 5. Transfer Thumbnail from Uncompressed to Compressed Bucket ---

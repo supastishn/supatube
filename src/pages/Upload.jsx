@@ -11,56 +11,20 @@ const Upload = () => {
   const [description, setDescription] = useState('');
   const [videoFile, setVideoFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [duration, setDuration] = useState(null); // State to store video duration in seconds
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { user } = useAuth(); // Get current user
 
-  // Function to get video duration
-  const getVideoDuration = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const media = new Audio(reader.result);
-        media.onloadedmetadata = () => resolve(Math.round(media.duration)); // Resolve with rounded duration in seconds
-        media.onerror = (e) => reject(`Error getting video duration: ${e.message || 'Unknown error'}`);
-      };
-      reader.onerror = (e) => reject(`Error reading file: ${e.message || 'Unknown error'}`);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleVideoFileChange = async (e) => {
+  const handleVideoFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) {
       setVideoFile(null);
-      setDuration(null);
       return;
     }
 
     setVideoFile(file);
     setError(''); // Clear previous errors
-    setDuration(null); // Reset duration while calculating
-    setIsLoading(true); // Show loading indicator during duration calculation
-
-    try {
-      const videoDuration = await getVideoDuration(file);
-      const numericDuration = Number(videoDuration);
-      if (isNaN(numericDuration) || numericDuration <= 0 || !Number.isFinite(numericDuration) || numericDuration > 86400) {
-          throw new Error('Could not determine a valid video duration.');
-      }
-      console.log('Video duration calculated:', numericDuration);
-      setDuration(numericDuration);
-    } catch (err) {
-      console.error("Duration calculation error:", err);
-      setError(err.message || 'Could not read video duration. Please try a different file.');
-      setVideoFile(null); // Invalidate file selection
-      setDuration(null);
-      e.target.value = null; // Reset file input visually
-    } finally {
-      setIsLoading(false); // Hide loading indicator
-    }
   };
 
   const handleThumbnailFileChange = (e) => {
@@ -75,13 +39,6 @@ const Upload = () => {
 
     if (!title || !videoFile || !thumbnailFile) {
       setError('Please provide a title, a video file, and a thumbnail file.');
-      return;
-    }
-
-    // Stricter validation for duration
-    const numericDuration = Number(duration); // Ensure it's treated as a number
-    if (duration === null || isNaN(numericDuration) || numericDuration <= 0 || !Number.isFinite(numericDuration) || numericDuration > 86400) {
-      setError('Could not determine a valid video duration. Please reselect the video file or try a different file.');
       return;
     }
 
@@ -131,7 +88,6 @@ const Upload = () => {
           title: title,                       // string (required)
           uncompressedFileId: uncompressedFileId, // Store ID of the uncompressed file
           thumbnail_id: thumbnailId,          // string (required)
-          video_duration: duration,           // integer (required)
           description: description || null,   // string (optional)
           status: 'pending'                   // Initial status
         },
@@ -149,7 +105,6 @@ const Upload = () => {
       setDescription('');
       setVideoFile(null);
       setThumbnailFile(null);
-      setDuration(null);
       // Reset file inputs requires targeting them or resetting the form
       e.target.reset(); // Resets the form fields
 
@@ -227,16 +182,11 @@ const Upload = () => {
             className="form-input"
           />
           {videoFile && !error && <p className="file-info">Selected: {videoFile.name}</p>}
-          {duration && !error && <p className="file-info">Duration: {duration} seconds</p>}
         </div>
 
-        <button type="submit" className="btn-primary" disabled={isLoading || (videoFile && duration === null)}>
+        <button type="submit" className="btn-primary" disabled={isLoading}>
           {isLoading ? 'Processing...' : 'Upload Video'}
         </button>
-         {/* Message indicating duration calculation */}
-         {videoFile && duration === null && !isLoading && !error &&
-            <p className="form-info">Calculating video duration...</p>
-         }
       </form>
 
       <style jsx>{`

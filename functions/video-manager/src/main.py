@@ -9,6 +9,7 @@ from appwrite.query import Query
 import os
 import subprocess # For running FFmpeg
 import traceback # For detailed error logging
+import json # For handling JSON data
 
 # --- Configuration ---
 DATABASE_ID = "database"
@@ -31,6 +32,44 @@ FFMPEG_ABITRATE = '128k' # Audio bitrate
 # Temporary file paths within the function's execution environment
 TMP_INPUT_DIR = '/tmp/input'
 TMP_OUTPUT_DIR = '/tmp/output'
+
+def get_video_duration_ffmpeg(file_path, context):
+    """Gets video duration using ffprobe."""
+    ffprobe_command = [
+        'ffprobe',
+        '-v', 'error',                     # Only show errors
+        '-show_entries', 'format=duration', # Get duration from format section
+        '-of', 'default=noprint_wrappers=1:nokey=1', # Output only the value
+        file_path
+    ]
+    context.log(f"Executing ffprobe command: {' '.join(ffprobe_command)}")
+    try:
+        result = subprocess.run(ffprobe_command, check=True, capture_output=True, text=True, timeout=30) # Added timeout
+        duration_str = result.stdout.strip()
+        context.log(f"ffprobe result: '{duration_str}'")
+        if not duration_str:
+             raise ValueError("ffprobe returned empty output.")
+        duration_float = float(duration_str)
+        duration_int = int(round(duration_float)) # Round to nearest second
+        if duration_int <= 0:
+            raise ValueError(f"ffprobe returned invalid duration: {duration_int}")
+        context.log(f"Calculated duration: {duration_int} seconds")
+        return duration_int
+    except FileNotFoundError:
+        context.error("ffprobe command not found. Ensure FFmpeg (including ffprobe) is installed in the function environment.")
+        raise
+    except subprocess.CalledProcessError as e:
+        context.error(f"ffprobe failed with exit code {e.returncode}.")
+        context.error(f"ffprobe stdout: {e.stdout}")
+        context.error(f"ffprobe stderr: {e.stderr}")
+        raise ValueError(f"ffprobe failed: {e.stderr}")
+    except ValueError as e:
+        context.error(f"Error parsing ffprobe duration output '{duration_str}': {e}")
+        raise ValueError(f"Could not parse duration from ffprobe: {e}")
+    except Exception as e:
+        context.error(f"An unexpected error occurred during ffprobe execution: {e}")
+        context.error(traceback.format_exc())
+        raise
 
 def run_ffmpeg(input_path, output_path, context):
     """Runs the FFmpeg compression command."""
@@ -121,14 +160,13 @@ def main(context):
             thumbnail_id = processing_doc.get('thumbnailId')
             title = processing_doc.get('title')
             description = processing_doc.get('description')
-            duration = processing_doc.get('duration')
             input_file_path = None
             output_file_path = None
 
             context.log(f"--- Processing document: {processing_doc_id} for file: {uncompressed_file_id} ---")
 
-            if not all([uncompressed_file_id, thumbnail_id, title, duration is not None]):
-                context.error(f"Skipping {processing_doc_id}: Missing required data (file IDs, title, or duration).")
+            if not all([uncompressed_file_id, thumbnail_id, title]):
+                context.error(f"Skipping {processing_doc_id}: Missing required data (file IDs or title).")
                 try:
                     databases.update_document(
                         DATABASE_ID, VIDEO_PROCESSING_COLLECTION_ID, processing_doc_id,
@@ -186,6 +224,28 @@ def main(context):
                 with open(input_file_path, 'wb') as f:
                     f.write(file_data)
                 context.log(f"File downloaded successfully to {input_file_path}")
+                
+                # --- 3b. Calculate Video Duration ---
+                calculated_duration = None
+                try:
+                    calculated_duration = get_video_duration_ffmpeg(input_file_path, context)
+                    if calculated_duration is None or calculated_duration <= 0:
+                         raise ValueError("Invalid duration calculated.")
+                except Exception as e:
+                    error_message = f"Failed to calculate duration for {uncompressed_file_id}: {e}"
+                    context.error(error_message)
+                    try:
+                        databases.update_document(
+                            DATABASE_ID, VIDEO_PROCESSING_COLLECTION_ID, processing_doc_id,
+                            {'status': 'failed', 'errorMessage': error_message}
+                        )
+                    except Exception as update_err:
+                        context.error(f"Failed to update status for failed duration calc {processing_doc_id}: {update_err}")
+                    failed_count += 1
+                    # Cleanup downloaded file
+                    if input_file_path and os.path.exists(input_file_path):
+                         os.remove(input_file_path)
+                    continue # Move to next document
             except Exception as e:
                 error_message = f"Failed to download file {uncompressed_file_id}: {e}"
                 context.error(error_message)
@@ -309,7 +369,7 @@ def main(context):
                     'description': description,
                     'video_id': compressed_file_id, # Use the NEW compressed file ID
                     'thumbnail_id': final_thumbnail_id, # Use the NEW final thumbnail ID
-                    'video_duration': duration,
+                    'video_duration': calculated_duration, # Use the calculated duration
                     # Counts will default to 0 based on collection schema
                 }
                 video_doc = databases.create_document(

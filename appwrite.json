@@ -318,7 +318,7 @@
             "attributes": [
                 { "key": "title", "type": "string", "required": true, "size": 100, "array": false },
                 { "key": "description", "type": "string", "required": false, "size": 1000, "array": false },
-                { "key": "duration", "type": "integer", "required": true, "min": 0, "array": false },
+                { "key": "duration", "type": "integer", "required": false, "min": 0, "array": false, "default": null },
                 { "key": "uncompressedFileId", "type": "string", "required": true, "size": 100, "array": false },
                 { "key": "thumbnailId", "type": "string", "required": true, "size": 100, "array": false },
                 { "key": "status", "type": "string", "required": false, "size": 15, "default": "pending", "array": false },
@@ -387,7 +387,6 @@
             "$id": "videos",
             "$permissions": [
                 "read(\"guests\")",
-                "create(\"users\")",
                 "read(\"users\")"
             ],
             "databaseId": "database",

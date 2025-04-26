@@ -5,6 +5,8 @@ export const appwriteConfig = {
     projectId: 'supatube',
     databaseId: 'database',                  // Database ID
     videosCollectionId: 'videos',            // Videos collection ID
+    videoProcessingCollectionId: 'video-processing', // NEW: Video processing queue collection
+    storageVideosUncompressedBucketId: 'videos-uncompressed', // NEW: Uncompressed video bucket
     storageVideosBucketId: 'videos',         // Videos storage bucket ID
     accountsCollectionId: 'accounts',        // Accounts collection ID
     likesCollectionId: 'likes',              // Likes collection ID

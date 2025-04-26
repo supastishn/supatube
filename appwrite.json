@@ -89,7 +89,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 30,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
+            "commands": "pip install -r requirements.txt && apt-get update && apt-get install -y ffmpeg",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/likes-manager"
         },
@@ -105,11 +105,13 @@
             "scopes": [
                 "users.read",
                 "documents.read",
-                "documents.write"
+                "documents.write",
+                "files.read",
+                "files.write"
             ],
             "events": [],
-            "schedule": "",
-            "timeout": 15,
+            "schedule": "*/1 * * * *",
+            "timeout": 900,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
@@ -303,6 +305,34 @@
                 }
             ],
             "indexes": []
+        },
+        {
+            "$id": "video-processing",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Video Processing Queue",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                { "key": "title", "type": "string", "required": true, "size": 100, "array": false },
+                { "key": "description", "type": "string", "required": false, "size": 1000, "array": false },
+                { "key": "duration", "type": "integer", "required": true, "min": 0, "array": false },
+                { "key": "uncompressedFileId", "type": "string", "required": true, "size": 100, "array": false },
+                { "key": "thumbnailId", "type": "string", "required": true, "size": 100, "array": false },
+                { "key": "status", "type": "string", "required": true, "size": 15, "default": "pending", "array": false },
+                { "key": "errorMessage", "type": "string", "required": false, "size": 500, "array": false }
+            ],
+            "indexes": [
+                {
+                    "key": "status_index",
+                    "type": "key",
+                    "status": "available",
+                    "attributes": ["status"],
+                    "orders": ["ASC"]
+                }
+            ]
         },
         {
             "$id": "user_video_states",
@@ -679,6 +709,20 @@
             ],
             "fileSecurity": true,
             "name": "videos",
+            "enabled": true,
+            "maximumFileSize": 1000000000,
+            "allowedFileExtensions": [],
+            "compression": "none",
+            "encryption": false,
+            "antivirus": true
+        },
+        {
+             "$id": "videos-uncompressed",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "fileSecurity": true,
+            "name": "Videos Uncompressed",
             "enabled": true,
             "maximumFileSize": 5000000000,
             "allowedFileExtensions": [],

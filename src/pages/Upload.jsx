@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { databases, storage } from '../lib/appwriteConfig'; // Import Appwrite services
-import { ID } from 'appwrite';                             // Import ID directly from 'appwrite'
+import { ID, Permission, Role } from 'appwrite'; // Import ID, Permission, Role
 import { appwriteConfig } from '../lib/appwriteConfig'; // Import config for IDs
+import { useAuth } from '../context/AuthContext'; // Import useAuth to get user ID
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Upload = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const { user } = useAuth(); // Get current user
 
   // Function to get video duration
   const getVideoDuration = (file) => {
@@ -80,47 +82,65 @@ const Upload = () => {
       return;
     }
 
+    if (!user) {
+      setError('You must be logged in to upload videos.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       // 1. Upload Thumbnail
       console.log('Uploading thumbnail...');
       const thumbnailFileUpload = await storage.createFile(
-        appwriteConfig.storageVideosBucketId, // bucketId
-        ID.unique(),                          // fileId
-        thumbnailFile                         // file
+        appwriteConfig.storageVideosBucketId, // bucketId (main 'videos' bucket)
+        ID.unique(),                          // fileId (unique)
+        thumbnailFile,                         // file object
+        [ // Permissions for thumbnail
+            Permission.read(Role.any()),          // Publicly readable
+            Permission.delete(Role.user(user.$id)) // Owner can delete
+        ]
       );
       const thumbnailId = thumbnailFileUpload.$id;
       console.log('Thumbnail uploaded:', thumbnailId);
 
-      // 2. Upload Video
-      console.log('Uploading video...');
+      // 2. Upload *Uncompressed* Video
+      console.log('Uploading uncompressed video...');
       const videoFileUpload = await storage.createFile(
-        appwriteConfig.storageVideosBucketId, // bucketId
-        ID.unique(),                          // fileId
-        videoFile                             // file
+        appwriteConfig.storageVideosUncompressedBucketId, // *** Upload to UNCOMPRESSED bucket ***
+        ID.unique(),                                      // fileId (unique)
+        videoFile,                                        // file object
+        [ // Permissions for uncompressed video
+            Permission.delete(Role.user(user.$id)) // Only owner can delete (needed for function)
+            // No read needed for general users on uncompressed file
+        ]
       );
-      const videoId = videoFileUpload.$id;
-      console.log('Video uploaded:', videoId);
+      const uncompressedFileId = videoFileUpload.$id;
+      console.log('Uncompressed video uploaded:', uncompressedFileId);
 
-      // 3. Create Video Document in Database
-      console.log('Creating database document...');
+      // 3. Create Video Processing Document
+      console.log('Creating video processing document...');
       await databases.createDocument(
         appwriteConfig.databaseId,            // databaseId
-        appwriteConfig.videosCollectionId,    // collectionId
+        appwriteConfig.videoProcessingCollectionId, // *** Target PROCESSING collection ***
         ID.unique(),                          // documentId
         {                                     // data
           title: title,                       // string (required)
-          video_id: videoId,                  // string (required)
+          uncompressedFileId: uncompressedFileId, // Store ID of the uncompressed file
           thumbnail_id: thumbnailId,          // string (required)
           video_duration: duration,           // integer (required)
-          description: description || null,   // string (optional) - send null if empty
-          // TODO: Add userId later if needed: user_id: user.$id
-        }
+          description: description || null,   // string (optional)
+          status: 'pending'                   // Initial status
+        },
+        [ // Permissions for processing document
+            Permission.read(Role.user(user.$id)),   // Owner can read status
+            Permission.update(Role.user(user.$id)), // Owner can potentially update/cancel (future)
+            Permission.delete(Role.user(user.$id))  // Owner can delete request (needed for function ID)
+        ]
       );
-      console.log('Database document created.');
+      console.log('Video processing document created.');
 
-      setSuccess('Video uploaded successfully!');
+      setSuccess('Upload complete! Your video is now being processed.');
       // Clear form
       setTitle('');
       setDescription('');

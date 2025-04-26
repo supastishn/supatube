@@ -46,11 +46,12 @@ const Upload = () => {
 
     try {
       const videoDuration = await getVideoDuration(file);
-      if (isNaN(videoDuration) || videoDuration <= 0) {
+      const numericDuration = Number(videoDuration);
+      if (isNaN(numericDuration) || numericDuration <= 0 || !Number.isFinite(numericDuration) || numericDuration > 86400) {
           throw new Error('Could not determine a valid video duration.');
       }
-      console.log('Video duration calculated:', videoDuration);
-      setDuration(videoDuration);
+      console.log('Video duration calculated:', numericDuration);
+      setDuration(numericDuration);
     } catch (err) {
       console.error("Duration calculation error:", err);
       setError(err.message || 'Could not read video duration. Please try a different file.');
@@ -77,8 +78,10 @@ const Upload = () => {
       return;
     }
 
-    if (duration === null || duration <= 0) { // Ensure duration is a positive number
-      setError('Valid video duration is required. Please reselect the video file.');
+    // Stricter validation for duration
+    const numericDuration = Number(duration); // Ensure it's treated as a number
+    if (duration === null || isNaN(numericDuration) || numericDuration <= 0 || !Number.isFinite(numericDuration) || numericDuration > 86400) {
+      setError('Could not determine a valid video duration. Please reselect the video file or try a different file.');
       return;
     }
 

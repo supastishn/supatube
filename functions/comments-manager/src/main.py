@@ -281,8 +281,8 @@ def main(context):
                         }
                     )
                     context.log(f"Updated video_counts document for {video_id}.")
-
-            elif interaction_type == 'delete':
+                
+                elif interaction_type == 'delete':
                     # --- DELETE LOGIC ---
                     context.log(f"Processing DELETE interaction {interaction_id}")
                     

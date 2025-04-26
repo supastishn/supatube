@@ -113,7 +113,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 900,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt && apt-get update && apt-get install -y ffmpeg",
+            "commands": "pip install -r requirements.txt && apk update && apk add ffmpeg",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-manager"
         },

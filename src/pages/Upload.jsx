@@ -93,11 +93,11 @@ const Upload = () => {
       // 1. Upload Thumbnail
       console.log('Uploading thumbnail...');
       const thumbnailFileUpload = await storage.createFile(
-        appwriteConfig.storageVideosBucketId, // bucketId (main 'videos' bucket)
+        appwriteConfig.storageVideosUncompressedBucketId, // *** Upload thumbnail to UNCOMPRESSED bucket ***
         ID.unique(),                          // fileId (unique)
         thumbnailFile,                         // file object
         [ // Permissions for thumbnail
-            Permission.read(Role.any()),          // Publicly readable
+            // No public read needed initially, function will move it
             Permission.delete(Role.user(user.$id)) // Owner can delete
         ]
       );

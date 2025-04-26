@@ -203,6 +203,7 @@ def main(context):
                 continue # Move to next document
 
             # --- 4. Compress Video using FFmpeg ---
+            final_thumbnail_id = None # Initialize final thumbnail ID
             try:
                 output_file_name = f"{uncompressed_file_id}.{FFMPEG_OUTPUT_FORMAT}" # Use original ID + new extension
                 output_file_path = os.path.join(TMP_OUTPUT_DIR, output_file_name)
@@ -223,17 +224,61 @@ def main(context):
                 # Cleanup temporary files
                 if input_file_path and os.path.exists(input_file_path): os.remove(input_file_path)
                 if output_file_path and os.path.exists(output_file_path): os.remove(output_file_path)
+                if thumbnail_input_path and os.path.exists(thumbnail_input_path): os.remove(thumbnail_input_path)
+                if thumbnail_input_path and os.path.exists(thumbnail_input_path): os.remove(thumbnail_input_path)
                 continue # Move to next document
 
-            # --- 5. Upload Compressed Video ---
+            # --- 5. Transfer Thumbnail from Uncompressed to Compressed Bucket ---
+            thumbnail_input_path = None
+            try:
+                context.log(f"Downloading original thumbnail {thumbnail_id} from {VIDEOS_UNCOMPRESSED_BUCKET_ID}...")
+                thumbnail_input_path = os.path.join(TMP_INPUT_DIR, f"thumb_{thumbnail_id}") # Temp path for thumbnail
+                thumb_data = storage.get_file_download(VIDEOS_UNCOMPRESSED_BUCKET_ID, thumbnail_id)
+                with open(thumbnail_input_path, 'wb') as f:
+                    f.write(thumb_data)
+                context.log(f"Thumbnail downloaded to {thumbnail_input_path}")
+
+                context.log(f"Uploading thumbnail {thumbnail_input_path} to final bucket {VIDEOS_BUCKET_ID}...")
+                thumb_input_file = InputFile.from_path(thumbnail_input_path)
+                thumb_upload_response = storage.create_file(
+                    VIDEOS_BUCKET_ID,
+                    'unique()', # New ID for thumbnail in final bucket
+                    thumb_input_file,
+                    [ # Permissions for the final thumbnail
+                        Permission.read(Role.any()),      # Publicly readable thumbnail
+                        Permission.delete(Role.user(creator_id)) # Owner can delete
+                    ]
+                )
+                final_thumbnail_id = thumb_upload_response['$id']
+                context.log(f"Thumbnail transferred successfully. Final Thumbnail ID: {final_thumbnail_id}")
+
+            except Exception as e:
+                error_message = f"Failed to transfer thumbnail {thumbnail_id}: {e}"
+                context.error(error_message)
+                try:
+                    databases.update_document(
+                        DATABASE_ID, VIDEO_PROCESSING_COLLECTION_ID, processing_doc_id,
+                        {'status': 'failed', 'errorMessage': error_message}
+                    )
+                except Exception as update_err:
+                    context.error(f"Failed to update status for failed thumbnail transfer {processing_doc_id}: {update_err}")
+                failed_count += 1
+                # Cleanup potential temporary files
+                if input_file_path and os.path.exists(input_file_path): os.remove(input_file_path)
+                if output_file_path and os.path.exists(output_file_path): os.remove(output_file_path)
+                if thumbnail_input_path and os.path.exists(thumbnail_input_path): os.remove(thumbnail_input_path)
+                continue # Move to next document
+
+            # --- 6. Upload Compressed Video ---
             compressed_file_id = None
             try:
-                context.log(f"Uploading compressed file {output_file_path} to bucket {VIDEOS_BUCKET_ID}...")
-                compressed_file = InputFile.from_path(output_file_path)
-                upload_response = storage.create_file(
-                    VIDEOS_BUCKET_ID,
-                    'unique()', # Let Appwrite generate ID for compressed file
-                    compressed_file,
+                context.log(f"Uploading compressed video {output_file_path} to bucket {VIDEOS_BUCKET_ID}...")
+                with open(output_file_path, 'rb') as video_file_handle:
+                    compressed_file_for_upload = InputFile.from_bytes(video_file_handle.read(), filename=os.path.basename(output_file_path))
+                    upload_response = storage.create_file(
+                        VIDEOS_BUCKET_ID,
+                        'unique()', # Let Appwrite generate ID for compressed file
+                        compressed_file_for_upload,
                     [ # Permissions for compressed video
                         Permission.read(Role.any()), # Publicly readable
                         Permission.delete(Role.user(creator_id)) # Owner can delete
@@ -257,14 +302,14 @@ def main(context):
                 if output_file_path and os.path.exists(output_file_path): os.remove(output_file_path)
                 continue # Move to next document
 
-            # --- 6. Create Final Video Document ---
+            # --- 7. Create Final Video Document ---
             try:
                 context.log(f"Creating final video document in collection {VIDEOS_COLLECTION_ID}...")
                 final_video_data = {
                     'title': title,
                     'description': description,
                     'video_id': compressed_file_id, # Use the NEW compressed file ID
-                    'thumbnail_id': thumbnail_id,
+                    'thumbnail_id': final_thumbnail_id, # Use the NEW final thumbnail ID
                     'video_duration': duration,
                     # Counts will default to 0 based on collection schema
                 }
@@ -286,6 +331,12 @@ def main(context):
                 # Attempt to roll back: delete compressed file if DB entry fails
                 if compressed_file_id:
                     try:
+                        context.log(f"Rolling back: Deleting transferred thumbnail {final_thumbnail_id}...")
+                        storage.delete_file(VIDEOS_BUCKET_ID, final_thumbnail_id)
+                    except Exception as delete_err:
+                         context.error(f"Failed to rollback transferred thumbnail {final_thumbnail_id}: {delete_err}")
+                if final_thumbnail_id:
+                    try:
                         context.log(f"Rolling back: Deleting compressed file {compressed_file_id}...")
                         storage.delete_file(VIDEOS_BUCKET_ID, compressed_file_id)
                     except Exception as delete_err:
@@ -303,7 +354,7 @@ def main(context):
                 if output_file_path and os.path.exists(output_file_path): os.remove(output_file_path)
                 continue # Move to next document
 
-            # --- 7. Delete Uncompressed Video File ---
+            # --- 8. Delete Uncompressed Video File ---
             try:
                 context.log(f"Deleting original uncompressed file {uncompressed_file_id} from {VIDEOS_UNCOMPRESSED_BUCKET_ID}...")
                 storage.delete_file(VIDEOS_UNCOMPRESSED_BUCKET_ID, uncompressed_file_id)
@@ -312,7 +363,16 @@ def main(context):
                 # Log error but don't fail the whole process just for this cleanup step
                 context.error(f"Warning: Failed to delete original uncompressed file {uncompressed_file_id}: {e}")
 
-            # --- 8. Delete Processing Document ---
+            # --- 9. Delete Uncompressed Thumbnail File ---
+            try:
+                context.log(f"Deleting original thumbnail file {thumbnail_id} from {VIDEOS_UNCOMPRESSED_BUCKET_ID}...")
+                storage.delete_file(VIDEOS_UNCOMPRESSED_BUCKET_ID, thumbnail_id)
+                context.log("Original thumbnail file deleted successfully.")
+            except Exception as e:
+                 # Log error but don't fail the whole process just for this cleanup step
+                 context.error(f"Warning: Failed to delete original thumbnail file {thumbnail_id}: {e}")
+
+            # --- 10. Delete Processing Document ---
             try:
                 context.log(f"Deleting processing document {processing_doc_id}...")
                 databases.delete_document(DATABASE_ID, VIDEO_PROCESSING_COLLECTION_ID, processing_doc_id)
@@ -323,7 +383,7 @@ def main(context):
                 context.error(f"Warning: Failed to delete processing document {processing_doc_id}: {e}")
                 processed_count += 1 # Still count as processed
 
-            # --- 9. Cleanup Local Files ---
+            # --- 11. Cleanup Local Files ---
             finally: # Ensure cleanup happens even if DB deletes fail
                  context.log("Cleaning up temporary files...")
                  if input_file_path and os.path.exists(input_file_path):
@@ -338,6 +398,12 @@ def main(context):
                          context.log(f"Removed {output_file_path}")
                      except Exception as e:
                          context.error(f"Error removing output file {output_file_path}: {e}")
+                 if thumbnail_input_path and os.path.exists(thumbnail_input_path):
+                     try:
+                         os.remove(thumbnail_input_path)
+                         context.log(f"Removed {thumbnail_input_path}")
+                     except Exception as e:
+                         context.error(f"Error removing thumbnail input file {thumbnail_input_path}: {e}")
 
             context.log(f"--- Finished processing document: {processing_doc_id} ---")
 

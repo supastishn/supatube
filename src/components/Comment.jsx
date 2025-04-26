@@ -86,7 +86,8 @@ const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0
     userAvatarUrl,
     commentText,
     timestamp,
-    replies = [] // Default replies to empty array
+    replies = [], // Default replies to empty array
+    pending // Add pending property from the comment object
   } = comment;
 
   // TODO: Add state and handler for showing/posting replies in Phase 2

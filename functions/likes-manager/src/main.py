@@ -295,16 +295,17 @@ def main(context):
                             context.log(f"Video ID {video_id} not found in account arrays, no cleanup needed.")
 
                         if needs_update:
-                            databases.update_document(
-                                database_id=DATABASE_ID,
-                                collection_id=ACCOUNTS_COLLECTION_ID,
-                                document_id=user_id,
-                                data={
-                                    'videosLiked': cleaned_liked,
-                                    'videosDisliked': cleaned_disliked
-                                }
-                            )
-                            context.log(f"Cleaned up account arrays for user {user_id}, video {video_id}.")
+                            # Commenting out the cleanup update to preserve arrays in accounts collection
+                            # databases.update_document(
+                            #     database_id=DATABASE_ID,
+                            #     collection_id=ACCOUNTS_COLLECTION_ID,
+                            #     document_id=user_id,
+                            #     data={
+                            #         'videosLiked': cleaned_liked,
+                            #         'videosDisliked': cleaned_disliked
+                            #     }
+                            # )
+                            context.log(f"Skipping cleanup of account arrays for user {user_id}, video {video_id} as requested.")
                         cleanup_successful = True # Flag success
                     except AppwriteException as e:
                          context.error(f"Failed to clean up account arrays for user {user_id}, video {video_id}: {e}. Interaction {interaction_id} will NOT be deleted.")

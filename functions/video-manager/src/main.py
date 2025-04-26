@@ -36,7 +36,7 @@ TMP_OUTPUT_DIR = '/tmp/output'
 def get_video_duration_ffmpeg(file_path, context):
     """Gets video duration using ffprobe."""
     ffprobe_command = [
-        'ffprobe',
+        '/usr/bin/ffprobe',
         '-v', 'error',                     # Only show errors
         '-show_entries', 'format=duration', # Get duration from format section
         '-of', 'default=noprint_wrappers=1:nokey=1', # Output only the value
@@ -76,7 +76,7 @@ def run_ffmpeg(input_path, output_path, context):
     context.log(f"Starting FFmpeg compression: {input_path} -> {output_path}")
     # Scale: -2 means calculate width automatically to maintain aspect ratio for the given height
     ffmpeg_command = [
-        'ffmpeg',
+        '/usr/bin/ffmpeg',
         '-i', input_path,
         '-vf', f"scale=-2:{FFMPEG_RESOLUTION}", # Scale to target height
         '-r', FFMPEG_FRAMERATE,                 # Set frame rate

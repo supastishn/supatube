@@ -289,7 +289,7 @@
                 {
                     "key": "type",
                     "type": "string",
-                    "required": true,
+                    "required": false,
                     "size": 10,
                     "default": "create",
                     "array": false

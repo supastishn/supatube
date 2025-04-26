@@ -167,6 +167,8 @@ def main(context):
                 current_dislike_count = 0
                 create_counts_doc = False
                 
+                # Extract parent comment ID if it exists for a reply
+                parent_comment_id = interaction_doc.get('parentCommentId')
                 # Check if parent comment is valid if one was provided
                 has_parent_comment_id = bool(parent_comment_id)
                 is_top_level_parent = False
@@ -219,6 +221,10 @@ def main(context):
                     else:
                         raise Exception(f"Error fetching video_counts doc for {video_id}: {e}")
 
+                # --- Extract Comment Text and Temporary Client ID ---
+                comment_text = interaction_doc.get('commentText', '')
+                temporary_client_id = interaction_doc.get('temporaryClientId', '')
+                
                 # --- Create New Comment Object ---
                 comment_id = str(uuid.uuid4())
                 timestamp_iso = datetime.now(timezone.utc).isoformat()

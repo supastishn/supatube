@@ -5,7 +5,7 @@ import { appwriteConfig } from '../lib/appwriteConfig';
 import { Permission, Role } from 'appwrite'; // Add Permission and Role
 
 const Account = () => {
-  const { user, account, updateUserProfile, logout } = useAuth(); // Get user, account obj, update function, and logout
+  const { user, accountDetails, likedVideoIds, dislikedVideoIds, account, updateUserProfile, logout } = useAuth(); // Get user, account obj, update function, and logout
   const [name, setName] = useState('');
   const [bio, setBio] = useState(''); // Renamed from description to bio
   const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
@@ -51,9 +51,10 @@ const Account = () => {
           name: name, // Always include the current name state
           bio: bio,
           profileImageUrl: profileImageUrl,
-          videosLiked: user?.videosLiked || [],      // Include required array
-          videosDisliked: user?.videosDisliked || [], // Include required array
-          subscribingTo: user?.subscribingTo || []    // Include required array
+          subscribingTo: accountDetails?.subscribingTo || [], // Use context value or default
+          // --- Use Sets from context for like/dislike arrays ---
+          videosLiked: Array.from(likedVideoIds),    // Use Set from context
+          videosDisliked: Array.from(dislikedVideoIds) // Use Set from context
         };
         
         try {

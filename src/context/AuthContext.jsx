@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }) => {
   // Helper to fetch user data including video states
   const fetchUserDataAndStates = async (userId) => {
     let accountDoc = null;
-    let fetchedLikedIds = new Set();
-    let fetchedDislikedIds = new Set();
+    let accountVideosLiked = []; // Initialize as empty arrays
+    let accountVideosDisliked = [];
 
     // Fetch core account details first
     try {
@@ -35,44 +35,27 @@ export const AuthProvider = ({ children }) => {
             appwriteConfig.accountsCollectionId,
             userId
         );
+        // --- Get arrays directly from accountDoc ---
+        accountVideosLiked = accountDoc?.videosLiked || [];
+        accountVideosDisliked = accountDoc?.videosDisliked || [];
+        console.log(`[AuthContext] Fetched account arrays: Liked(${accountVideosLiked.length}), Disliked(${accountVideosDisliked.length})`);
+
     } catch (error) {
         if (error.code !== 404) {
             console.error("Failed to fetch account details:", error);
+        } else {
+            console.log(`[AuthContext] Account doc not found for ${userId}, using empty arrays.`);
         }
         // Proceed even if account doc doesn't exist yet, defaults will be used
-    }
-
-    // Fetch video states
-    try {
-        console.log(`[AuthContext] Fetching video states for user ${userId}...`);
-        // Simple fetch up to 5000 states (adjust limit if needed, or implement pagination)
-        const stateResponse = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.userVideoStatesCollectionId, // Use the new collection ID
-            [
-                Query.equal('userId', userId),
-                Query.limit(5000) // Adjust limit as necessary
-            ]
-        );
-        stateResponse.documents.forEach(doc => {
-            if (doc.state === 'liked') {
-                fetchedLikedIds.add(doc.videoId);
-            } else if (doc.state === 'disliked') {
-                fetchedDislikedIds.add(doc.videoId);
-            }
-        });
-        console.log(`[AuthContext] Fetched ${fetchedLikedIds.size} liked, ${fetchedDislikedIds.size} disliked states.`);
-    } catch (stateError) {
-        console.error("Failed to fetch user video states:", stateError);
-        // Proceed with empty sets on error
     }
 
     return {
         bio: accountDoc?.bio || '', // Default if doc or field is missing
         profileImageUrl: accountDoc?.profileImageUrl || null,
         subscribingTo: accountDoc?.subscribingTo || [],
-        initialLikedIds: fetchedLikedIds,
-        initialDislikedIds: fetchedDislikedIds
+        // --- Return the arrays fetched from account ---
+        initialLikedIds: accountVideosLiked,
+        initialDislikedIds: accountVideosDisliked
     };
   };
 
@@ -89,10 +72,11 @@ export const AuthProvider = ({ children }) => {
             profileImageUrl: userData.profileImageUrl,
             subscribingTo: userData.subscribingTo
         });
-        setLikedVideoIds(userData.initialLikedIds);
-        setDislikedVideoIds(userData.initialDislikedIds);
+        // --- Initialize Sets directly from the fetched account arrays ---
+        setLikedVideoIds(new Set(userData.initialLikedIds));
+        setDislikedVideoIds(new Set(userData.initialDislikedIds));
 
-        console.log("[AuthContext] User status checked, state updated.");
+        console.log("[AuthContext] User status checked, state updated from account arrays.");
 
     } catch (error) {
         if (error.code !== 401) {
@@ -120,15 +104,18 @@ export const AuthProvider = ({ children }) => {
 
       if (newAccount) {
         try {
+          // Create account document WITH NEW ARRAYS
           await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.accountsCollectionId,
             userId,
-            { // Data for the accounts document
+            {
               name: name,
               bio: '',
               profileImageUrl: null,
-              subscribingTo: [] // REMOVED videosLiked, videosDisliked
+              subscribingTo: [],
+              videosLiked: [], // Add required empty array
+              videosDisliked: [] // Add required empty array
             },
             [ // Permissions
               Permission.read(Role.user(userId)),
@@ -229,6 +216,64 @@ export const AuthProvider = ({ children }) => {
      console.log(`[AuthContext Optimistic] Updated client state sets for ${videoId}, action ${action}`);
   };
 
+  // --- Add updateAccountLikeDislikeArrays ---
+  const updateAccountLikeDislikeArrays = async (videoId, action) => {
+    if (!user) {
+        console.warn("[AuthContext] Cannot update account arrays: User not logged in.");
+        return;
+    }
+    console.log(`[AuthContext] Queueing update for account arrays: video ${videoId}, action ${action}`);
+
+    try {
+        // Fetch the latest arrays (optional, could use current context state but fetch is safer)
+        const currentAccountDoc = await databases.getDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.accountsCollectionId,
+            user.$id
+        );
+        let currentLiked = new Set(currentAccountDoc.videosLiked || []);
+        let currentDisliked = new Set(currentAccountDoc.videosDisliked || []);
+
+        // Apply the action
+        if (action === 'like') {
+            if (currentLiked.has(videoId)) {
+                currentLiked.delete(videoId); // Toggle off like
+            } else {
+                currentLiked.add(videoId); // Add like
+                currentDisliked.delete(videoId); // Remove potential dislike
+            }
+        } else if (action === 'dislike') {
+            if (currentDisliked.has(videoId)) {
+                currentDisliked.delete(videoId); // Toggle off dislike
+            } else {
+                currentDisliked.add(videoId); // Add dislike
+                currentLiked.delete(videoId); // Remove potential like
+            }
+        }
+
+        // Convert Sets back to arrays for update
+        const updatedLikedArray = Array.from(currentLiked);
+        const updatedDislikedArray = Array.from(currentDisliked);
+
+        // Update the document
+        await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.accountsCollectionId,
+            user.$id,
+            {
+                videosLiked: updatedLikedArray,
+                videosDisliked: updatedDislikedArray
+                // Only update these fields to avoid overwriting concurrent updates to bio/name etc.
+            }
+        );
+        console.log(`[AuthContext] Successfully updated account arrays for user ${user.$id}`);
+
+    } catch (error) {
+        console.error(`[AuthContext] Failed to update account arrays for user ${user.$id}:`, error);
+        // Log the error, but don't block the user. The backend function will eventually correct the state.
+    }
+  };
+
   const value = {
     user,
     accountDetails, // Expose details separately
@@ -241,8 +286,8 @@ export const AuthProvider = ({ children }) => {
     getAvatarUrl,
     checkUserStatus,
     updateUserProfile,
-    updateClientVideoStates, // Expose the new function
-    // remove updateUserLikeDislikeState
+    updateClientVideoStates, // Keep this for immediate UI update
+    updateAccountLikeDislikeArrays, // Expose the new function
     account, // Keep access to account service if needed elsewhere
   };
 

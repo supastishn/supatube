@@ -461,20 +461,20 @@
                     "default": null
                 },
                 {
-                    "key": "commentsJson",
+                    "key": "videosLiked",
                     "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 1,
-                    "default": null
+                    "required": true,
+                    "array": true,
+                    "size": 100,
+                    "default": []
                 },
                 {
-                    "key": "commentCount",
+                    "key": "videosDisliked",
                     "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 1,
-                    "default": null
+                    "required": true,
+                    "array": true,
+                    "size": 100,
+                    "default": []
                 }
             ],
             "indexes": []

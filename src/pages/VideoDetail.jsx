@@ -40,7 +40,7 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
-  const { user: currentUser, likedVideoIds, dislikedVideoIds, updateClientVideoStates } = useAuth(); // Import new state/function
+  const { user: currentUser, likedVideoIds, dislikedVideoIds, updateClientVideoStates, updateAccountLikeDislikeArrays } = useAuth(); // Import new state/function
   const navigate = useNavigate(); // For redirecting to sign-in
 
   const [video, setVideo] = useState(null);
@@ -98,7 +98,10 @@ const VideoDetail = () => {
     const previousDislikeCount = dislikeCount;
 
     // 1. Update AuthContext client state sets IMMEDIATELY
-    updateClientVideoStates(videoId, action); // Use the new function
+    updateClientVideoStates(videoId, action); // Use the existing function for Sets
+
+    // --- ADDED STEP: Update the account document arrays asynchronously ---
+    updateAccountLikeDislikeArrays(videoId, action); // Call the new function, no need to await
 
     // 2. Optimistically update LOCAL counts for UI feedback
     // Use the status *before* the update to calculate the change
@@ -133,14 +136,14 @@ const VideoDetail = () => {
       setLikeCount(previousLikeCount);
       setDislikeCount(previousDislikeCount);
       // DO NOT revert the AuthContext state change (the Sets).
-      // Inform user preference is saved locally but counts might be delayed/wrong.
+      // DO NOT revert the account array update (it was fire-and-forget).
       setLikeError(error.message || `Failed to sync ${action}. Your preference is saved.`);
 
     } finally {
       setIsLiking(false);
     }
 // Add dependencies for the new context values used
-}, [currentUser, videoId, isLiking, likeCount, dislikeCount, likedVideoIds, dislikedVideoIds, navigate, updateClientVideoStates, setIsLiking, setLikeError, setLikeCount, setDislikeCount]);
+}, [currentUser, videoId, isLiking, likeCount, dislikeCount, likedVideoIds, dislikedVideoIds, navigate, updateClientVideoStates, updateAccountLikeDislikeArrays, setIsLiking, setLikeError, setLikeCount, setDislikeCount]);
 
   // Video deletion handler
   const handleDeleteVideo = async () => {

@@ -255,24 +255,84 @@ def main(context):
                             context.log(f"Created new state doc {new_state_doc['$id']}.")
                     else:
                         context.log(f"Warning: Unexpected new_state '{new_state}' - no action taken on user_video_states.")
-
+                    state_update_successful = True # Flag success
                 except AppwriteException as e:
-                    context.error(f"Failed to update user_video_states for user {user_id}, video {video_id}: {e}. Interaction {interaction_id} will NOT be deleted.")
+                    context.error(f"Failed to update user_video_states for user {user_id}, video {video_id}: {e}. Interaction {interaction_id} will NOT be deleted or cleaned up.")
                     failed_count += 1
-                    continue # Skip deleting the interaction log if state update fails
+                    state_update_successful = False # Flag failure
+                    continue # Skip cleanup and deletion for this interaction
 
-                # --- Delete Interaction ---
+                # --- Fetch User's Account Document ---
+                account_doc = None
+                current_account_liked = []
+                current_account_disliked = []
                 try:
-                    databases.delete_document(
-                        DATABASE_ID,
-                        VIDEO_INTERACTIONS_COLLECTION_ID,
-                        interaction_id
-                    )
-                    context.log(f"Deleted interaction {interaction_id}.")
-                    processed_count += 1
+                    account_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, user_id)
+                    current_account_liked = account_doc.get('videosLiked', []) or [] # Default to empty list if null/missing
+                    current_account_disliked = account_doc.get('videosDisliked', []) or []
+                    context.log(f"Fetched account doc {user_id}. Current array sizes: Liked({len(current_account_liked)}), Disliked({len(current_account_disliked)})")
                 except AppwriteException as e:
-                    context.error(f"Failed to delete interaction {interaction_id} after processing: {e}.")
-                    failed_count += 1
+                    if e.code == 404:
+                         context.log(f"Account doc {user_id} not found. Cannot clean up arrays, but proceeding with counts/state.")
+                         # account_doc remains None, cleanup will be skipped later
+                    else:
+                         context.error(f"Error fetching account doc {user_id}: {e}. Skipping interaction {interaction_id}.")
+                         failed_count += 1
+                         continue # Skip this interaction if we can't fetch the account doc (other than 404)
+
+                # --- Cleanup Account Arrays (Only if state update was successful) ---
+                if state_update_successful and account_doc: # Check if account_doc was fetched successfully
+                    try:
+                        # Remove the video_id from both lists, regardless of interaction type
+                        needs_update = False
+                        cleaned_liked = [vid for vid in current_account_liked if vid != video_id]
+                        cleaned_disliked = [vid for vid in current_account_disliked if vid != video_id]
+
+                        if len(cleaned_liked) != len(current_account_liked) or len(cleaned_disliked) != len(current_account_disliked):
+                            needs_update = True
+                            context.log(f"Video ID {video_id} found in account arrays, preparing cleanup.")
+                        else:
+                            context.log(f"Video ID {video_id} not found in account arrays, no cleanup needed.")
+
+                        if needs_update:
+                            databases.update_document(
+                                database_id=DATABASE_ID,
+                                collection_id=ACCOUNTS_COLLECTION_ID,
+                                document_id=user_id,
+                                data={
+                                    'videosLiked': cleaned_liked,
+                                    'videosDisliked': cleaned_disliked
+                                }
+                            )
+                            context.log(f"Cleaned up account arrays for user {user_id}, video {video_id}.")
+                        cleanup_successful = True # Flag success
+                    except AppwriteException as e:
+                         context.error(f"Failed to clean up account arrays for user {user_id}, video {video_id}: {e}. Interaction {interaction_id} will NOT be deleted.")
+                         failed_count += 1
+                         cleanup_successful = False # Flag failure
+                         continue # Skip interaction deletion if cleanup fails
+                elif not account_doc:
+                     context.log(f"Skipping account array cleanup for interaction {interaction_id} as account doc was not found.")
+                     cleanup_successful = True # Consider it "successful" for flow control as there was nothing to clean
+                else:
+                    # This branch is entered if state_update_successful was false
+                    cleanup_successful = False
+
+                # --- Delete Interaction (Only if state update AND cleanup were successful) ---
+                if state_update_successful and cleanup_successful:
+                    try:
+                        databases.delete_document(
+                            DATABASE_ID,
+                            VIDEO_INTERACTIONS_COLLECTION_ID,
+                            interaction_id
+                        )
+                        context.log(f"Deleted interaction {interaction_id}.")
+                        processed_count += 1
+                    except AppwriteException as e:
+                        context.error(f"Failed to delete interaction {interaction_id} after processing: {e}.")
+                        failed_count += 1
+                else:
+                    context.log(f"Skipping deletion of interaction {interaction_id} due to prior failure.")
 
             except Exception as e:
                 context.error(f"Unexpected error processing interaction: {e}")

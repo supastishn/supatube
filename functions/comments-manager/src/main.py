@@ -281,8 +281,8 @@ def main(context):
                         }
                     )
                     context.log(f"Updated video_counts document for {video_id}.")
-                
-                elif interaction_type == 'delete':
+            
+            elif interaction_type == 'delete':
                     # --- DELETE LOGIC ---
                     context.log(f"Processing DELETE interaction {interaction_id}")
                     
@@ -346,21 +346,21 @@ def main(context):
                         )
                         context.log(f"Updated video_counts document for {video_id}. New count: {new_comment_count}")
                 
-            else:
-                context.error(f"Unknown interaction type '{interaction_type}' for interaction {interaction_id}. Skipping.")
-                failed_count += 1
-                continue
+        else:
+            context.error(f"Unknown interaction type '{interaction_type}' for interaction {interaction_id}. Skipping.")
+            failed_count += 1
+            continue
                     
-                # --- Delete Interaction Document (Common for successful create/delete) ---
-                context.log(f"Deleting interaction document {interaction_id}...")
-                databases.delete_document(
-                    DATABASE_ID,
-                    COMMENTS_INTERACTIONS_COLLECTION_ID,
-                    interaction_id
-                )
-                context.log(f"Deleted interaction document {interaction_id}.")
-                
-                processed_count += 1
+            # --- Delete Interaction Document (Common for successful create/delete) ---
+            context.log(f"Deleting interaction document {interaction_id}...")
+            databases.delete_document(
+                DATABASE_ID,
+                COMMENTS_INTERACTIONS_COLLECTION_ID,
+                interaction_id
+            )
+            context.log(f"Deleted interaction document {interaction_id}.")
+            
+            processed_count += 1
 
             except Exception as e:
                 context.error(f"Error processing interaction {interaction_doc.get('$id', 'unknown')}: {e}")

@@ -710,7 +710,7 @@
             "fileSecurity": true,
             "name": "videos",
             "enabled": true,
-            "maximumFileSize": 1000000000,
+            "maximumFileSize": 5000000000,
             "allowedFileExtensions": [],
             "compression": "none",
             "encryption": false,

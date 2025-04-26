@@ -138,54 +138,21 @@
         {
             "$id": "comments-manager",
             "execute": [
-                "users"
+                "any"
             ],
             "name": "comments-manager",
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [
-                "sessions.write",
                 "users.read",
-                "users.write",
-                "teams.read",
-                "teams.write",
                 "databases.read",
                 "databases.write",
-                "collections.read",
-                "collections.write",
-                "attributes.read",
-                "attributes.write",
-                "indexes.read",
-                "indexes.write",
                 "documents.read",
-                "documents.write",
-                "files.read",
-                "files.write",
-                "buckets.read",
-                "buckets.write",
-                "functions.read",
-                "functions.write",
-                "execution.read",
-                "execution.write",
-                "targets.read",
-                "targets.write",
-                "providers.read",
-                "providers.write",
-                "messages.read",
-                "messages.write",
-                "topics.read",
-                "topics.write",
-                "subscribers.read",
-                "subscribers.write",
-                "locale.read",
-                "avatars.read",
-                "health.read",
-                "migrations.read",
-                "migrations.write"
+                "documents.write"
             ],
             "events": [],
-            "schedule": "",
+            "schedule": "*/1 * * * *",
             "timeout": 15,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
@@ -281,6 +248,47 @@
         }
     ],
     "collections": [
+        {
+            "$id": "comments-interactions",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Comments Interactions",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "commentText",
+                    "type": "string",
+                    "required": true,
+                    "size": 2000,
+                    "array": false
+                },
+                {
+                    "key": "parentCommentId",
+                    "type": "string",
+                    "required": false,
+                    "size": 100,
+                    "array": false
+                },
+                {
+                    "key": "temporaryClientId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                }
+            ],
+            "indexes": []
+        },
         {
             "$id": "user_video_states",
             "$permissions": [
@@ -458,7 +466,7 @@
                     "required": true,
                     "array": true,
                     "size": 999999,
-                    "default": null
+                    "default": []
                 },
                 {
                     "key": "videosLiked",

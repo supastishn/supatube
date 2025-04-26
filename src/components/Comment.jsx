@@ -38,13 +38,17 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
     setReplyError('');
 
     try {
-      // Call the service, passing the CURRENT comment's ID as the parent
-      await postComment(videoId, trimmedReply, comment.commentId);
+      // Call the interaction service, passing parent ID and user ID
+      await postComment(videoId, trimmedReply, comment.commentId, currentUser.$id);
+      console.log('Reply interaction created for parent:', comment.commentId);
       setReplyText(''); // Clear input
       setShowReplyInput(false); // Hide input form
-      if (onReplyPosted) {
-        onReplyPosted(); // Trigger refresh in parent (VideoDetail)
-      }
+      // Wait for processing before refreshing
+      setTimeout(() => {
+        if (onReplyPosted) {
+          onReplyPosted(); // Trigger refresh in parent (VideoDetail)
+        }
+      }, 1500); // Short delay to allow background processing
     } catch (error) {
       console.error("Failed to post reply:", error);
       setReplyError(error.message || "Failed to post reply.");
@@ -115,7 +119,7 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
 
         {/* Render Replies Recursively (if any) */}
         {replies.length > 0 && (
-          <div className="comment-replies">
+          <div className="comment-replies" style={{ marginLeft: depth === 0 ? '52px' : '0' }}>
             {replies.map(reply => (
               <Comment
                 key={reply.commentId}
@@ -217,8 +221,7 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
 
           .comment-replies {
             margin-top: 12px;
-            padding-left: 52px; /* Indent replies (avatar width + gap) */
-            /* border-left: 2px solid var(--light-gray); */ /* Optional visual indicator */
+            /* Indent is now handled by inline style based on depth */
           }
        `}</style>
     </div>

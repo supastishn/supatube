@@ -546,12 +546,15 @@ const VideoDetail = () => {
     setCommentPostError('');
 
     try {
-      const newComment = await postComment(videoId, trimmedComment);
-      // Add new comment to the top of the list (optimistic update)
-      setComments(prevComments => [newComment, ...prevComments]);
+      // Call the interaction service, passing the current user's ID
+      const result = await postComment(videoId, trimmedComment, null, currentUser.$id);
+      console.log('Comment interaction created:', result);
+      // No optimistic update - wait for next refresh/poll
       setNewCommentText(''); // Clear input field
-      setVideoCommentCount(prev => prev + 1); // Increment local count
-      // Note: The server also updates the commentCount in the database
+      // Trigger a refresh of comments after short delay to allow processing
+      setTimeout(() => {
+        loadComments(); // Reload comments from server
+      }, 1500); // Give the background process a moment to run
     } catch (error) {
       console.error("Failed to post comment:", error);
       setCommentPostError(error.message || "Failed to post comment.");

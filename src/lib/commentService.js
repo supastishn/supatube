@@ -1,4 +1,6 @@
 import { functions, databases, appwriteConfig } from './appwriteConfig';
+import { ID, Permission, Role } from 'appwrite';
+import { v4 as uuidv4 } from 'uuid';
 
 const COMMENTS_FUNCTION_ID = 'comments-manager';
 
@@ -7,39 +9,51 @@ const COMMENTS_FUNCTION_ID = 'comments-manager';
  * @param {string} videoId
  * @param {string} commentText
  * @param {string | null} parentCommentId - ID of the parent comment if replying, null otherwise.
- * @returns {Promise<object>} - The newly created comment object from the backend.
+ * @param {string} userId - ID of the user posting the comment.
+ * @returns {Promise<{success: boolean, temporaryClientId: string}>} - Confirmation and the temporary ID used.
  */
-export const postComment = async (videoId, commentText, parentCommentId = null) => {
+export const postComment = async (videoId, commentText, parentCommentId = null, userId) => {
   console.log(`[commentService] Posting comment. Video: ${videoId}, Parent: ${parentCommentId}, Text: ${commentText.substring(0, 30)}...`);
 
+  if (!userId) {
+    throw new Error("User ID is required to post a comment interaction.");
+  }
+  if (!videoId || !commentText) {
+    throw new Error("Video ID and comment text are required.");
+  }
+
+  // Generate a temporary client ID for this specific attempt
+  const temporaryClientId = `temp-${uuidv4()}`;
+
   try {
-    const result = await functions.createExecution(
-      COMMENTS_FUNCTION_ID,
-      JSON.stringify({ videoId, commentText, parentCommentId }),
-      false, // Synchronous execution
-      '/',
-      'POST'
+    // Data for the interaction document
+    const interactionData = {
+      videoId,
+      commentText,
+      parentCommentId: parentCommentId || null, // Ensure null if empty
+      temporaryClientId
+    };
+
+    // Permissions: Creator can manage, function (via API key) reads implicitly
+    const docPermissions = [
+      Permission.read(Role.user(userId)),
+      Permission.update(Role.user(userId)),
+      Permission.delete(Role.user(userId))
+    ];
+
+    // Create the interaction document
+    const response = await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.commentsInteractionsCollectionId, // Use the new collection ID
+      ID.unique(), // Appwrite generates document ID
+      interactionData,
+      docPermissions
     );
 
-    console.log(`[commentService] Raw function result:`, result);
+    console.log(`[commentService] Interaction document created: ${response.$id} with temp ID: ${temporaryClientId}`);
 
-    if (result.status === 'failed') {
-      let errorMsg = 'Comment function execution failed.';
-      try {
-        const errorDetails = JSON.parse(result.responseBody);
-        if (errorDetails.message) errorMsg = errorDetails.message;
-      } catch (e) { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
-
-    const responseData = JSON.parse(result.responseBody);
-    console.log(`[commentService] Parsed function response:`, responseData);
-
-    if (responseData.success !== 'true' || !responseData.comment) {
-      throw new Error(responseData.message || 'Failed to post comment.');
-    }
-
-    return responseData.comment; // Return the new comment object
+    // Return success and the temporary ID (no optimistic object needed now)
+    return { success: true, temporaryClientId };
 
   } catch (error) {
     console.error('[commentService] Error posting comment:', error);

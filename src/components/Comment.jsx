@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { postComment } from '../lib/commentService';
+import { 
+  createTempComment,
+  addPendingComment
+} from '../lib/commentUtils';
 import { formatDistanceToNowStrict, parseISO } from 'date-fns';
 
 // Helper function to format date (e.g., 2 weeks ago) - Can be moved to utils
@@ -14,7 +18,7 @@ const formatTimeAgo = (dateString) => {
   }
 };
 
-const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
+const Comment = ({ comment, videoId, onReplyPosted, onOptimisticReply, depth = 0 }) => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -34,21 +38,40 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
       return;
     }
 
+    // Create optimistic reply
+    const tempReply = createTempComment(
+      videoId, 
+      trimmedReply, 
+      comment.commentId, 
+      currentUser
+    );
+    
+    // Add to localStorage
+    addPendingComment(tempReply);
+    
+    // Notify parent component to update state for optimistic UI
+    if (onOptimisticReply) {
+      onOptimisticReply(tempReply);
+    }
+    
+    // Clear input and hide form
+    setReplyText('');
+    setShowReplyInput(false);
+
     setIsPostingReply(true);
     setReplyError('');
 
     try {
       // Call the interaction service, passing parent ID and user ID
-      await postComment(videoId, trimmedReply, comment.commentId, currentUser.$id);
+      await postComment(
+        videoId, 
+        trimmedReply, 
+        comment.commentId, 
+        currentUser.$id,
+        tempReply.temporaryClientId
+      );
       console.log('Reply interaction created for parent:', comment.commentId);
-      setReplyText(''); // Clear input
-      setShowReplyInput(false); // Hide input form
-      // Wait for processing before refreshing
-      setTimeout(() => {
-        if (onReplyPosted) {
-          onReplyPosted(); // Trigger refresh in parent (VideoDetail)
-        }
-      }, 1500); // Short delay to allow background processing
+      // No need to refresh immediately - optimistic update is showing
     } catch (error) {
       console.error("Failed to post reply:", error);
       setReplyError(error.message || "Failed to post reply.");
@@ -69,7 +92,7 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
   // TODO: Add state and handler for showing/posting replies in Phase 2
 
   return (
-    <div className="comment-item" id={`comment-${commentId}`}>
+    <div className={`comment-item ${pending ? 'pending' : ''}`} id={`comment-${commentId}`}>
       <Link to={`/profile/${userId}`} className="comment-avatar-link">
         <img
           src={userAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || '?')}&background=random`}
@@ -81,7 +104,10 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
       <div className="comment-content">
         <div className="comment-header">
           <Link to={`/profile/${userId}`} className="comment-author-name">{userName || 'User'}</Link>
-          <span className="comment-timestamp">{formatTimeAgo(timestamp)}</span>
+          <span className="comment-timestamp">
+            {formatTimeAgo(timestamp)}
+            {pending && <span className="pending-indicator"> (posting...)</span>}
+          </span>
         </div>
         <p className="comment-text">{commentText}</p>
         {/* Comment Actions */}
@@ -138,6 +164,9 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
             gap: 12px;
             margin-bottom: 16px; /* Space below each comment */
           }
+          .comment-item.pending {
+            opacity: 0.7;
+          }
           .comment-avatar-link {
             flex-shrink: 0;
           }
@@ -168,6 +197,10 @@ const Comment = ({ comment, videoId, onReplyPosted, depth = 0 }) => {
           }
           .comment-timestamp {
             font-size: 12px;
+            color: var(--text-secondary);
+          }
+          .pending-indicator {
+            font-style: italic;
             color: var(--text-secondary);
           }
           .comment-text {

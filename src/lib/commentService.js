@@ -10,9 +10,10 @@ const COMMENTS_FUNCTION_ID = 'comments-manager';
  * @param {string} commentText
  * @param {string | null} parentCommentId - ID of the parent comment if replying, null otherwise.
  * @param {string} userId - ID of the user posting the comment.
+ * @param {string} [providedTempId=null] - Optional temporary client ID for optimistic updates.
  * @returns {Promise<{success: boolean, temporaryClientId: string}>} - Confirmation and the temporary ID used.
  */
-export const postComment = async (videoId, commentText, parentCommentId = null, userId) => {
+export const postComment = async (videoId, commentText, parentCommentId = null, userId, providedTempId = null) => {
   console.log(`[commentService] Posting comment. Video: ${videoId}, Parent: ${parentCommentId}, Text: ${commentText.substring(0, 30)}...`);
 
   if (!userId) {
@@ -22,8 +23,8 @@ export const postComment = async (videoId, commentText, parentCommentId = null, 
     throw new Error("Video ID and comment text are required.");
   }
 
-  // Generate a temporary client ID for this specific attempt
-  const temporaryClientId = `temp-${uuidv4()}`;
+  // Use provided temporary ID or generate a new one
+  const temporaryClientId = providedTempId || `temp-${uuidv4()}`;
 
   try {
     // Data for the interaction document

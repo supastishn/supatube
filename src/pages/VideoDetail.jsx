@@ -9,6 +9,15 @@ import { toggleSubscription } from '../lib/subscriptionService'; // Import subsc
 import Comment from '../components/Comment'; // Add this
 import { postComment, fetchCommentsForVideo } from '../lib/commentService'; // Add this
 import { deleteVideo } from '../lib/videoService'; // Import video deletion function
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { 
+  getPendingCommentsFromStorage, 
+  savePendingCommentsToStorage, 
+  createTempComment, 
+  addPendingComment,
+  cleanupExpiredComments,
+  PENDING_COMMENT_TIMEOUT_MS 
+} from '../lib/commentUtils';
 
 // Appwrite Imports
 import { databases, storage, avatars as appwriteAvatars, account, client } from '../lib/appwriteConfig';
@@ -417,9 +426,47 @@ const VideoDetail = () => {
     setCommentsError('');
     try {
       const fetchedComments = await fetchCommentsForVideo(videoId);
-      // Client-side sort (optional, backend already inserts newest first)
-      // fetchedComments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      setComments(fetchedComments);
+      
+      // Get pending comments from localStorage
+      const pendingComments = getPendingCommentsFromStorage()
+        .filter(p => p.videoId === videoId);
+      
+      // Identify which pending comments should be replaced with real ones
+      const pendingIdsToRemove = [];
+      
+      // Process fetched comments to identify those that match pending ones
+      const processedComments = fetchedComments.map(realComment => {
+        const tempClientId = realComment.temporaryClientId;
+        if (tempClientId) {
+          // Look for a pending comment with matching tempClientId
+          const matchingPendingComment = pendingComments.find(
+            p => p.temporaryClientId === tempClientId
+          );
+          
+          if (matchingPendingComment) {
+            // Mark this pending comment for removal from localStorage
+            pendingIdsToRemove.push(matchingPendingComment.commentId);
+          }
+        }
+        return realComment;
+      });
+      
+      // Remove matched pending comments from localStorage
+      if (pendingIdsToRemove.length > 0) {
+        const updatedPendingComments = getPendingCommentsFromStorage()
+          .filter(p => !pendingIdsToRemove.includes(p.commentId));
+        savePendingCommentsToStorage(updatedPendingComments);
+      }
+      
+      // Add remaining valid pending comments
+      const remainingValidPending = pendingComments
+        .filter(p => !pendingIdsToRemove.includes(p.commentId))
+        .filter(p => Date.now() - p.createdAt < PENDING_COMMENT_TIMEOUT_MS);
+      
+      // Combine and set the comments
+      const combinedComments = [...remainingValidPending, ...processedComments];
+      
+      setComments(combinedComments);
     } catch (error) {
       console.error("Failed to fetch comments:", error);
       setCommentsError("Could not load comments. Please try again later.");
@@ -430,6 +477,23 @@ const VideoDetail = () => {
 
   useEffect(() => {
     loadComments();
+
+    // Setup cleanup interval for expired comments
+    const cleanupInterval = setInterval(() => {
+      const { expired, valid } = cleanupExpiredComments();
+      
+      if (expired.length > 0) {
+        // Update UI state to remove expired comments
+        setComments(prev => prev.filter(c => {
+          // Keep if not pending OR if pending but still in valid list
+          return !c.pending || valid.some(v => v.commentId === c.commentId);
+        }));
+      }
+    }, 10000); // Check every 10 seconds
+
+    return () => {
+      clearInterval(cleanupInterval);
+    };
   }, [loadComments]); // Depend on the memoized function
 
   // --- Effect to fetch video counts (likes, dislikes, comments) ---
@@ -542,19 +606,32 @@ const VideoDetail = () => {
       return; // Ignore empty comments or if already posting
     }
 
+    // Create optimistic comment
+    const tempComment = createTempComment(videoId, trimmedComment, null, currentUser);
+    
+    // Add to state immediately for optimistic UI update
+    setComments(prev => [tempComment, ...prev]);
+    
+    // Add to localStorage
+    addPendingComment(tempComment);
+    
+    // Clear input field
+    setNewCommentText('');
+
     setIsPostingComment(true);
     setCommentPostError('');
 
     try {
       // Call the interaction service, passing the current user's ID
-      const result = await postComment(videoId, trimmedComment, null, currentUser.$id);
+      const result = await postComment(
+        videoId, 
+        trimmedComment, 
+        null, 
+        currentUser.$id, 
+        tempComment.temporaryClientId
+      );
       console.log('Comment interaction created:', result);
-      // No optimistic update - wait for next refresh/poll
-      setNewCommentText(''); // Clear input field
-      // Trigger a refresh of comments after short delay to allow processing
-      setTimeout(() => {
-        loadComments(); // Reload comments from server
-      }, 1500); // Give the background process a moment to run
+      // No need to reload - optimistic update is showing and will be reconciled
     } catch (error) {
       console.error("Failed to post comment:", error);
       setCommentPostError(error.message || "Failed to post comment.");
@@ -803,6 +880,21 @@ const VideoDetail = () => {
                   comment={comment}
                   videoId={videoId}
                   onReplyPosted={loadComments}
+                  onOptimisticReply={(tempReply) => {
+                    // Handle optimistic replies - add to parent comment
+                    setComments(prevComments => {
+                      return prevComments.map(c => {
+                        if (c.commentId === tempReply.parentCommentId) {
+                          // Found the parent comment, add reply to it
+                          return {
+                            ...c,
+                            replies: [tempReply, ...(c.replies || [])]
+                          };
+                        }
+                        return c;
+                      });
+                    });
+                  }}
                   depth={0} // Explicitly set depth=0 for top-level comments
                 />
               ))}

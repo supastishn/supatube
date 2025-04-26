@@ -87,7 +87,7 @@ const Upload = () => {
         {                                     // data
           title: title,                       // string (required)
           uncompressedFileId: uncompressedFileId, // Store ID of the uncompressed file
-          thumbnail_id: thumbnailId,          // string (required)
+          thumbnailId: thumbnailId,           // string (required) - MATCH SCHEMA
           description: description || null,   // string (optional)
           status: 'pending'                   // Initial status
         },

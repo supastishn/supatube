@@ -49,7 +49,7 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
-  const { user: currentUser, likedVideoIds, dislikedVideoIds, updateClientVideoStates, updateAccountLikeDislikeArrays } = useAuth(); // Import new state/function
+  const { user: currentUser, accountDetails, loading: authLoading, likedVideoIds, dislikedVideoIds, updateClientVideoStates, updateAccountLikeDislikeArrays, refreshUserProfile } = useAuth(); // Add accountDetails, authLoading, refreshUserProfile
   const navigate = useNavigate(); // For redirecting to sign-in
 
   const [video, setVideo] = useState(null);
@@ -205,6 +205,10 @@ const VideoDetail = () => {
     try {
       const result = await createSubscriptionInteraction(creatorId, action, currentUser.$id);
       console.log('Subscription interaction created:', result);
+      // --- ADD THIS: Refresh user profile data in context after successful interaction ---
+      console.log('[VideoDetail] Subscription interaction successful, refreshing user context...');
+      await refreshUserProfile(); // Re-fetch user data including subscriptions
+      console.log('[VideoDetail] User context refreshed.');
     } catch (error) {
       console.error('Subscription interaction failed:', error);
       // Revert optimistic updates
@@ -640,16 +644,17 @@ const VideoDetail = () => {
 
   // --- Effect to derive initial subscription status from user context ---
   useEffect(() => {
-    if (currentUser && video?.channel?.creatorUserId) {
+    // Check only if auth is loaded, user exists, details are loaded, and creator ID exists
+    if (!authLoading && currentUser && accountDetails && video?.channel?.creatorUserId) {
       const creatorId = video.channel.creatorUserId;
-      // Use subscribingTo from context which now comes from user_subscriptions collection
-      const currentlySubscribed = (currentUser.subscribingTo || []).includes(creatorId);
+      // Use subscribingTo array from accountDetails (populated by AuthContext)
+      const currentlySubscribed = (accountDetails.subscribingTo || []).includes(creatorId);
       setIsSubscribed(currentlySubscribed);
       console.log(`[VideoDetail Sub Effect] Initial subscription status for ${creatorId}: ${currentlySubscribed}`);
     } else {
       setIsSubscribed(false); // Not logged in or no creator ID
     }
-  }, [currentUser, video?.channel?.creatorUserId]); // Re-run when user or creator ID changes
+  }, [currentUser, accountDetails, video?.channel?.creatorUserId, authLoading]); // Add accountDetails and authLoading
 
   // --- Render States ---
 

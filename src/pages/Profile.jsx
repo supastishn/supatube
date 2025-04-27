@@ -10,7 +10,7 @@ import { formatViews } from '../utils/formatters'; // Add this line
 const Profile = () => {
   const { userId } = useParams(); // Get userId from URL
   const navigate = useNavigate();
-  const { user: currentUser, accountDetails, loading: authLoading } = useAuth(); // Get user, details, loading state
+  const { user: currentUser, accountDetails, loading: authLoading, refreshUserProfile } = useAuth(); // Add refreshUserProfile
 
   const [userData, setUserData] = useState(null);
   const [userVideos, setUserVideos] = useState([]);
@@ -143,6 +143,11 @@ const Profile = () => {
 
     try {
       await createSubscriptionInteraction(userId, action, currentUser.$id);
+      // --- ADD THIS: Refresh user profile data in context after successful interaction ---
+      console.log('[Profile] Subscription interaction successful, refreshing user context...');
+      await refreshUserProfile(); // Re-fetch user data including subscriptions
+      console.log('[Profile] User context refreshed.');
+      // The useEffect watching accountDetails should now update isSubscribed correctly
     } catch (error) {
       console.error('Subscription interaction failed:', error);
       // Revert optimistic updates

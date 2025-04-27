@@ -204,8 +204,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Function to manually refresh user data + details after an update
-  const updateUserProfile = async () => {
+  const refreshUserProfile = async () => {
     try {
+      if (!user) return null; // No user to refresh
       const currentAccount = await account.get();
       const userData = await fetchUserDataAndStates(currentAccount.$id); // Re-fetch combined data
 
@@ -215,12 +216,13 @@ export const AuthProvider = ({ children }) => {
           profileImageUrl: userData.profileImageUrl,
           subscribingTo: userData.subscribingTo
       });
-      setLikedVideoIds(userData.initialLikedIds);
-      setDislikedVideoIds(userData.initialDislikedIds);
+      // Ensure liked/disliked Sets are also updated from the fresh fetch
+      setLikedVideoIds(new Set(userData.initialLikedIds));
+      setDislikedVideoIds(new Set(userData.initialDislikedIds));
 
       console.log("[AuthContext] User profile context refreshed.");
-      // Return combined data if needed
-      // return { ...currentAccount, ...userData };
+      // Return combined data including the core account info and fetched details
+      return { ...currentAccount, ...userData };
     } catch (error) {
       console.error("Failed to refresh user profile context:", error);
       // Handle potential logout or error display
@@ -323,7 +325,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     getAvatarUrl,
     checkUserStatus,
-    updateUserProfile,
+    refreshUserProfile, // Expose the renamed function
     updateClientVideoStates, // Keep this for immediate UI update
     updateAccountLikeDislikeArrays, // Expose the new function
     account, // Keep access to account service if needed elsewhere

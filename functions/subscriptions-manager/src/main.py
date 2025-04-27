@@ -3,16 +3,20 @@ from appwrite.services.databases import Databases
 from appwrite.exception import AppwriteException
 from appwrite.permission import Permission
 from appwrite.role import Role
+from appwrite.query import Query
 import os
 import json
+import traceback
 
 # Configuration Constants
 DATABASE_ID = "database"
 ACCOUNTS_COLLECTION_ID = "accounts"
 CHANNEL_STATS_COLLECTION_ID = "channel_stats"
+ACCOUNT_INTERACTIONS_COLLECTION_ID = "account_interactions"
+MAX_PROCESSING_LIMIT = 50  # Number of interactions to process per run
 
 def main(context):
-    context.log("--- Subscriptions Manager Invocation Start ---")
+    context.log("--- Subscriptions Manager Batch Job Start ---")
 
     # Environment Variable Check
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")
@@ -22,131 +26,206 @@ def main(context):
     if not all([api_endpoint, project_id, api_key]):
         message = "Missing required environment variables."
         context.error(message)
-        return context.res.json({"success": "false", "message": message}, 500)
-
-    # Authentication Check
-    subscriber_id = context.req.headers.get('x-appwrite-user-id')
-    if not subscriber_id:
-        message = "Authentication required."
-        context.error(message)
-        return context.res.json({"success": "false", "message": message}, 401)
-    context.log(f"Authenticated Subscriber ID: {subscriber_id}")
-
-    # Input Parsing and Validation
-    creator_id = None
-    action = None
-    try:
-        payload = json.loads(context.req.body_raw)
-        context.log(f"Parsed Payload: {payload}")
-        creator_id = payload.get('creatorId')
-        action = payload.get('action')
-
-        if not creator_id or action not in ['subscribe', 'unsubscribe']:
-            raise ValueError("Missing 'creatorId' or invalid 'action' ('subscribe'/'unsubscribe').")
-        if subscriber_id == creator_id:
-            raise ValueError("User cannot subscribe to themselves.")
-        context.log(f"Processing Action: {action}, Target Creator ID: {creator_id}")
-
-    except Exception as e:
-        message = f"Invalid request payload: {e}. Raw: '{context.req.body_raw}'"
-        context.error(message)
-        return context.res.json({"success": "false", "message": str(e)}, 400)
+        return context.res.json({"success": False, "message": message}, 500)
 
     # Initialize Appwrite Client
     client = Client()
     client.set_endpoint(api_endpoint).set_project(project_id).set_key(api_key)
     databases = Databases(client)
 
+    processed_count = 0
+    failed_count = 0
+
     try:
-        # --- Core Logic ---
-        context.log(f"Fetching subscriber's account: {subscriber_id}")
-        subscriber_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, subscriber_id)
-        subscribing_to_list = subscriber_doc.get('subscribingTo', []) or []
-        subscribing_to_set = set(subscribing_to_list)
-        is_currently_subscribed = creator_id in subscribing_to_set
-        context.log(f"Currently subscribed: {is_currently_subscribed}")
+        # --- Fetch Pending Interaction Documents ---
+        context.log("Fetching subscription interaction documents...")
+        interactions_response = databases.list_documents(
+            DATABASE_ID,
+            ACCOUNT_INTERACTIONS_COLLECTION_ID,
+            [Query.limit(MAX_PROCESSING_LIMIT)]
+        )
+        
+        interaction_docs = interactions_response.get('documents', [])
+        total_fetched = len(interaction_docs)
+        context.log(f"Fetched {total_fetched} interaction documents to process.")
 
-        count_change = 0
-        new_subscription_state = is_currently_subscribed # Default to current state
+        if total_fetched == 0:
+            context.log("No subscription interactions to process.")
+            context.log("--- Subscriptions Manager Batch Job End (No Work) ---")
+            return context.res.json({"success": True, "message": "No interactions found", 
+                                    "processed": 0, "failed": 0, "totalFetched": 0})
 
-        # Determine changes
-        if action == 'subscribe' and not is_currently_subscribed:
-            count_change = 1
-            new_subscription_state = True
-            subscribing_to_set.add(creator_id)
-        elif action == 'unsubscribe' and is_currently_subscribed:
-            count_change = -1
-            new_subscription_state = False
-            subscribing_to_set.discard(creator_id)
-        else:
-            # No change needed (e.g., subscribing when already subscribed)
-            context.log("No change in subscription state required.")
+        # --- Process Each Interaction Document ---
+        for interaction_doc in interaction_docs:
+            interaction_id = interaction_doc["$id"]
+            context.log(f"Processing interaction {interaction_id}...")
 
-        # Update Subscriber's Document if state changed
-        if new_subscription_state != is_currently_subscribed:
-            updated_subscribing_list = list(subscribing_to_set)
-            context.log(f"Updating subscriber document {subscriber_id} with new list (size {len(updated_subscribing_list)})...")
-            databases.update_document(
-                database_id=DATABASE_ID,
-                collection_id=ACCOUNTS_COLLECTION_ID,
-                document_id=subscriber_id,
-                data={'subscribingTo': updated_subscribing_list}
-            )
-            context.log(f"Subscriber document {subscriber_id} updated.")
-        else:
-             updated_subscribing_list = subscribing_to_list # Use original if no change
-
-        # Update Channel Stats if count changed
-        if count_change != 0:
-            context.log(f"Updating channel stats for creator {creator_id} (change: {count_change})...")
             try:
-                stats_doc = databases.get_document(DATABASE_ID, CHANNEL_STATS_COLLECTION_ID, creator_id)
-                current_count = stats_doc.get('subscriberCount', 0)
-                new_count = max(0, current_count + count_change)
-                context.log(f"Updating existing stats doc {creator_id}. New count: {new_count}")
-                databases.update_document(
-                    database_id=DATABASE_ID,
-                    collection_id=CHANNEL_STATS_COLLECTION_ID,
-                    document_id=creator_id,
-                    data={'subscriberCount': new_count}
-                )
-            except AppwriteException as e:
-                if e.code == 404:
-                    # Create stats document if it doesn't exist
-                    new_count = max(0, count_change) # Should be 1 if subscribing
-                    context.log(f"Creating new stats doc {creator_id}. Initial count: {new_count}")
-                    databases.create_document(
-                        database_id=DATABASE_ID,
-                        collection_id=CHANNEL_STATS_COLLECTION_ID,
-                        document_id=creator_id,
-                        data={'subscriberCount': new_count},
-                        permissions=[Permission.read(Role.any())] # Public read access
+                # --- Extract User ID from Permissions ---
+                subscriber_id = None
+                doc_permissions = interaction_doc.get('$permissions', [])
+                
+                # Look for update permission to determine the creator
+                update_permission_prefix = 'update("user:'
+                for perm in doc_permissions:
+                    if perm.startswith(update_permission_prefix):
+                        start_index = len(update_permission_prefix)
+                        end_index = perm.find('")', start_index)
+                        if end_index != -1:
+                            subscriber_id = perm[start_index:end_index]
+                            break # Found the user ID
+
+                if not subscriber_id:
+                    context.error(f"Could not determine user ID from permissions on interaction {interaction_id}.")
+                    failed_count += 1
+                    continue
+
+                # --- Extract Interaction Data ---
+                action = interaction_doc.get('type')
+                creator_id = interaction_doc.get('targetAccountId')
+
+                # --- Validate Data ---
+                if not creator_id or action not in ['subscribe', 'unsubscribe']:
+                    context.error(f"Invalid interaction data in {interaction_id}: Missing targetAccountId or invalid type.")
+                    failed_count += 1
+                    continue
+
+                # --- Check for Self-Subscription ---
+                if subscriber_id == creator_id:
+                    context.log(f"User {subscriber_id} attempted to subscribe to themselves. Skipping.")
+                    # Delete the invalid interaction and count as processed
+                    databases.delete_document(
+                        DATABASE_ID,
+                        ACCOUNT_INTERACTIONS_COLLECTION_ID, 
+                        interaction_id
                     )
-                else:
-                    # Log error but don't fail the whole operation
-                    context.error(f"Failed to get/update channel stats for {creator_id}: {e}")
-            context.log(f"Channel stats update complete for {creator_id}.")
-        else:
-            context.log("No change in subscriber count needed.")
+                    processed_count += 1
+                    continue
 
-        # --- Success Response ---
-        response_payload = {"success": "true", "isSubscribed": new_subscription_state}
-        context.log(f"Operation successful. Returning: {response_payload}")
-        context.log("--- Subscriptions Manager Invocation End (Success) ---")
-        return context.res.json(response_payload)
+                context.log(f"Processing Action: {action}, Subscriber: {subscriber_id}, Target: {creator_id}")
 
-    except AppwriteException as e:
-        # Handle errors fetching/updating subscriber doc more specifically
-        if e.code == 404 and e.message.__contains__(subscriber_id):
-             message = f"Subscriber account document not found for {subscriber_id}."
-             context.error(message)
-             return context.res.json({"success": "false", "message": message}, 404)
-        else:
-            message = f"Database error: {e.message}"
-            context.error(message)
-            return context.res.json({"success": "false", "message": message}, 500)
+                # --- Fetch Subscriber's Account Document ---
+                try:
+                    subscriber_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, subscriber_id)
+                    subscribing_to_list = subscriber_doc.get('subscribingTo', []) or []
+                    subscribing_to_set = set(subscribing_to_list)
+                    is_currently_subscribed = creator_id in subscribing_to_set
+                    context.log(f"Currently subscribed: {is_currently_subscribed}")
+
+                    count_change = 0
+                    new_subscription_state = is_currently_subscribed # Default to current state
+
+                    # --- Determine Necessary Changes ---
+                    if action == 'subscribe' and not is_currently_subscribed:
+                        count_change = 1
+                        new_subscription_state = True
+                        subscribing_to_set.add(creator_id)
+                    elif action == 'unsubscribe' and is_currently_subscribed:
+                        count_change = -1
+                        new_subscription_state = False
+                        subscribing_to_set.discard(creator_id)
+                    else:
+                        # No change needed (e.g., subscribing when already subscribed)
+                        context.log("No change in subscription state required.")
+
+                    # --- Update Subscriber's Document if State Changed ---
+                    subscription_updated = True
+                    if new_subscription_state != is_currently_subscribed:
+                        updated_subscribing_list = list(subscribing_to_set)
+                        context.log(f"Updating subscriber document {subscriber_id} with new list (size {len(updated_subscribing_list)})...")
+                        try:
+                            databases.update_document(
+                                database_id=DATABASE_ID,
+                                collection_id=ACCOUNTS_COLLECTION_ID,
+                                document_id=subscriber_id,
+                                data={'subscribingTo': updated_subscribing_list}
+                            )
+                            context.log(f"Subscriber document {subscriber_id} updated.")
+                        except AppwriteException as update_err:
+                            context.error(f"Failed to update subscriber document {subscriber_id}: {update_err}")
+                            subscription_updated = False
+                            raise update_err  # Re-raise to be caught by the outer try-except
+                    
+                    # --- Update Channel Stats if Count Changed ---
+                    stats_updated = True
+                    if count_change != 0:
+                        context.log(f"Updating channel stats for creator {creator_id} (change: {count_change})...")
+                        try:
+                            stats_doc = databases.get_document(DATABASE_ID, CHANNEL_STATS_COLLECTION_ID, creator_id)
+                            current_count = stats_doc.get('subscriberCount', 0)
+                            new_count = max(0, current_count + count_change)
+                            context.log(f"Updating existing stats doc {creator_id}. New count: {new_count}")
+                            databases.update_document(
+                                database_id=DATABASE_ID,
+                                collection_id=CHANNEL_STATS_COLLECTION_ID,
+                                document_id=creator_id,
+                                data={'subscriberCount': new_count}
+                            )
+                            context.log(f"Channel stats updated for {creator_id}.")
+                        except AppwriteException as e:
+                            if e.code == 404:
+                                # Create stats document if it doesn't exist
+                                new_count = max(0, count_change) # Should be 1 if subscribing
+                                context.log(f"Creating new stats doc {creator_id}. Initial count: {new_count}")
+                                try:
+                                    databases.create_document(
+                                        database_id=DATABASE_ID,
+                                        collection_id=CHANNEL_STATS_COLLECTION_ID,
+                                        document_id=creator_id,
+                                        data={'subscriberCount': new_count},
+                                        permissions=[Permission.read(Role.any())] # Public read access
+                                    )
+                                    context.log(f"Channel stats document created for {creator_id}.")
+                                except AppwriteException as create_err:
+                                    context.error(f"Failed to create channel stats document for {creator_id}: {create_err}")
+                                    stats_updated = False
+                                    raise create_err  # Re-raise to be caught by the outer try-except
+                            else:
+                                context.error(f"Failed to get/update channel stats for {creator_id}: {e}")
+                                stats_updated = False
+                                raise e  # Re-raise to be caught by the outer try-except
+
+                    # --- All Operations Succeeded, Delete Interaction Document ---
+                    if subscription_updated and stats_updated:
+                        context.log(f"Successfully processed interaction {interaction_id}, deleting document...")
+                        databases.delete_document(
+                            DATABASE_ID, 
+                            ACCOUNT_INTERACTIONS_COLLECTION_ID, 
+                            interaction_id
+                        )
+                        processed_count += 1
+                        context.log(f"Interaction {interaction_id} processed and deleted.")
+                    else:
+                        context.log(f"Interaction {interaction_id} partially processed but document not deleted.")
+                        failed_count += 1
+
+                except AppwriteException as e:
+                    if e.code == 404 and e.message.__contains__(subscriber_id):
+                        context.error(f"Subscriber account document not found for {subscriber_id}. Cannot process interaction {interaction_id}.")
+                    else:
+                        context.error(f"Database error processing interaction {interaction_id}: {e.message}")
+                    failed_count += 1
+                    # Don't delete the interaction document on failure
+                    
+            except Exception as e:
+                context.error(f"Error processing interaction {interaction_id}: {e}")
+                context.error(traceback.format_exc())
+                failed_count += 1
+                # Don't delete the interaction document on failure
+
+        # --- Return Summary ---
+        context.log(f"Processing complete: {processed_count} processed, {failed_count} failed.")
+        context.log("--- Subscriptions Manager Batch Job End (Success) ---")
+        return context.res.json({
+            "success": True,
+            "processed": processed_count,
+            "failed": failed_count,
+            "totalFetched": total_fetched
+        })
+
     except Exception as e:
-        # Catch any other unexpected errors
-        message = f"Unexpected server error: {e}"
-        context.error(message)
-        return context.res.json({"success": "false", "message": message}, 500)
+        context.error(f"Unexpected error during processing: {e}")
+        context.error(traceback.format_exc())
+        context.log("--- Subscriptions Manager Batch Job End (Error) ---")
+        return context.res.json({"success": False, "message": str(e),
+                               "processed": processed_count, "failed": failed_count}, 500)

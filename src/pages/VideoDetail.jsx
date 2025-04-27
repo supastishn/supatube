@@ -5,7 +5,7 @@ import { formatDistanceToNowStrict, parseISO } from 'date-fns'; // For time ago 
 import { Fragment } from 'react'; // Import Fragment if needed for structure
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 import { toggleLikeDislike } from '../lib/likesService'; // Import like service
-import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
+import { createSubscriptionInteraction } from '../lib/subscriptionService'; // Import subscription service
 import Comment from '../components/Comment'; // Add this
 import { postComment, fetchCommentsForVideo } from '../lib/commentService'; // Add this
 import { deleteVideo } from '../lib/videoService'; // Import video deletion function
@@ -203,16 +203,14 @@ const VideoDetail = () => {
     setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
 
     try {
-      const result = await toggleSubscription(creatorId, action);
-      // Optional: Update state definitively if needed, though optimistic is usually fine
-      // setIsSubscribed(result.isSubscribed);
-      console.log('Subscription toggle success:', result);
+      const result = await createSubscriptionInteraction(creatorId, action);
+      console.log('Subscription interaction created:', result);
     } catch (error) {
-      console.error('Subscription toggle failed:', error);
+      console.error('Subscription interaction failed:', error);
       // Revert optimistic updates
       setIsSubscribed(previousSubState);
       setSubscriberCount(previousSubCount);
-      setSubscriptionError(error.message || 'Failed to update subscription.');
+      setSubscriptionError(error.message || 'Failed to request subscription change.');
     } finally {
       setLoadingSubscription(false);
     }

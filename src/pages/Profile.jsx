@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { storage, databases, appwriteConfig } from '../lib/appwriteConfig';
 import { Query } from 'appwrite'; // Import Query directly from appwrite package
-import { toggleSubscription } from '../lib/subscriptionService'; // Import subscription service
+import { createSubscriptionInteraction } from '../lib/subscriptionService'; // Import subscription service
 import VideoCard from '../components/VideoCard'; // Import VideoCard
 import { useAuth } from '../context/AuthContext'; // Optional: To check if it's the current user's profile
 import { formatViews } from '../utils/formatters'; // Add this line
@@ -140,13 +140,13 @@ const Profile = () => {
     setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
 
     try {
-      await toggleSubscription(userId, action);
+      await createSubscriptionInteraction(userId, action);
     } catch (error) {
-      console.error('Subscription toggle failed:', error);
+      console.error('Subscription interaction failed:', error);
       // Revert optimistic updates
       setIsSubscribed(previousSubState);
       setSubscriberCount(previousSubCount);
-      setSubscriptionError(error.message || 'Failed to update subscription.');
+      setSubscriptionError(error.message || 'Failed to request subscription change.');
     } finally {
       setLoadingSubscription(false);
     }

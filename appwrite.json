@@ -164,7 +164,7 @@
         {
             "$id": "subscriptions-manager",
             "execute": [
-                "users"
+                "any"
             ],
             "name": "subscriptions-manager",
             "enabled": true,
@@ -211,7 +211,7 @@
                 "migrations.write"
             ],
             "events": [],
-            "schedule": "",
+            "schedule": "*/1 * * * *",
             "timeout": 15,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
@@ -250,6 +250,33 @@
         }
     ],
     "collections": [
+        {
+            "$id": "account_interactions",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Account Interactions",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "type",
+                    "type": "string",
+                    "required": true,
+                    "size": 15,
+                    "array": false
+                },
+                {
+                    "key": "targetAccountId",
+                    "type": "string",
+                    "required": true,
+                    "size": 100,
+                    "array": false
+                }
+            ],
+            "indexes": []
+        },
         {
             "$id": "comments-interactions",
             "$permissions": [

@@ -113,7 +113,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 900,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt \napk update \napk fetch ffmpeg",
+            "commands": "pip install -r requirements.txt \napk update \napk add ffmpeg ffmpeg-libs",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-manager"
         },

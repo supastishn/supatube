@@ -35,8 +35,9 @@ TMP_OUTPUT_DIR = '/tmp/output'
 
 def get_video_duration_ffmpeg(file_path, context):
     """Gets video duration using ffprobe."""
+    ffprobe_path = os.path.expanduser('~/ffprobe') # Resolve ~ to home directory
     ffprobe_command = [
-        './ffprobe',                       # Use relative path
+        ffprobe_path,                      # Use path in home directory
         '-v', 'error',                     # Only show errors
         '-show_entries', 'format=duration', # Get duration from format section
         '-of', 'default=noprint_wrappers=1:nokey=1', # Output only the value
@@ -56,7 +57,7 @@ def get_video_duration_ffmpeg(file_path, context):
         context.log(f"Calculated duration: {duration_int} seconds")
         return duration_int
     except FileNotFoundError:
-        context.error("ffprobe command not found. Ensure FFmpeg (including ffprobe) is installed in the function environment.")
+        context.error(f"ffprobe command not found at {ffprobe_path}. Ensure static binary was extracted correctly.")
         raise
     except subprocess.CalledProcessError as e:
         context.error(f"ffprobe failed with exit code {e.returncode}.")
@@ -73,10 +74,11 @@ def get_video_duration_ffmpeg(file_path, context):
 
 def run_ffmpeg(input_path, output_path, context):
     """Runs the FFmpeg compression command."""
+    ffmpeg_path = os.path.expanduser('~/ffmpeg') # Resolve ~ to home directory
     context.log(f"Starting FFmpeg compression: {input_path} -> {output_path}")
     # Scale: -2 means calculate width automatically to maintain aspect ratio for the given height
     ffmpeg_command = [
-        './ffmpeg',                            # Use relative path
+        ffmpeg_path,                           # Use path in home directory
         '-i', input_path,
         '-vf', f"scale=-2:{FFMPEG_RESOLUTION}", # Scale to target height
         '-r', FFMPEG_FRAMERATE,                 # Set frame rate
@@ -95,6 +97,9 @@ def run_ffmpeg(input_path, output_path, context):
         context.log(f"FFmpeg stdout: {result.stdout[-500:]}") # Log last part of stdout
         context.log(f"FFmpeg stderr: {result.stderr[-500:]}") # Log last part of stderr
         return True
+    except FileNotFoundError:
+        context.error(f"ffmpeg command not found at {ffmpeg_path}. Ensure static binary was extracted correctly.")
+        return False
     except subprocess.CalledProcessError as e:
         context.error(f"FFmpeg failed with exit code {e.returncode}.")
         context.error(f"FFmpeg stdout: {e.stdout}")

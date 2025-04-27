@@ -113,7 +113,7 @@
             "schedule": "*/1 * * * *",
             "timeout": 900,
             "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt \napk update \napk add --no-cache curl tar xz \ncurl -L \"https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz\" -o \"/tmp/ffmpeg.tar.xz\"\ntar -xf \"/tmp/ffmpeg.tar.xz\" -C . --strip-components=1 --wildcards \"*/ffmpeg\" \"*/ffprobe\"\nrm \"/tmp/ffmpeg.tar.xz\" ",
+            "commands": "pip install -r requirements.txt \napk update \napk add --no-cache curl tar xz \ncurl -L \"https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz\" -o \"/tmp/ffmpeg.tar.xz\"\ntar -xf \"/tmp/ffmpeg.tar.xz\" -C ~ --strip-components=1 --wildcards \"*/ffmpeg\" \"*/ffprobe\"\nrm \"/tmp/ffmpeg.tar.xz\" ",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-manager"
         },

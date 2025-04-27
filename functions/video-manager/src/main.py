@@ -420,6 +420,35 @@ def main(context):
                     ]
                 )
                 context.log(f"Final video document created successfully: {video_doc['$id']}")
+                
+                # --- Update Creator's Account Document with Uploaded Video ID ---
+                try:
+                    context.log(f"Fetching account document for creator {creator_id}...")
+                    account_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, creator_id)
+                    
+                    current_uploads = account_doc.get('videosUploaded', []) or [] # Default to empty list if null/missing
+                    new_video_id = video_doc['$id']
+                    
+                    # Avoid adding duplicates if function reruns partially
+                    if new_video_id not in current_uploads:
+                        updated_uploads = current_uploads + [new_video_id] # Append new video ID
+                        
+                        context.log(f"Updating account document {creator_id} with new videosUploaded array (length {len(updated_uploads)})...")
+                        databases.update_document(
+                            database_id=DATABASE_ID,
+                            collection_id=ACCOUNTS_COLLECTION_ID,
+                            document_id=creator_id,
+                            data={'videosUploaded': updated_uploads} # Update only the array
+                        )
+                        context.log(f"Account document {creator_id} updated successfully.")
+                    else:
+                        context.log(f"Video ID {new_video_id} already present in account {creator_id}'s videosUploaded array. Skipping update.")
+                    
+                except AppwriteException as acc_update_err:
+                    # Log error but don't fail the whole video processing for this
+                    context.error(f"Warning: Failed to update 'videosUploaded' array for account {creator_id}: {acc_update_err}")
+                except Exception as acc_general_err:
+                    context.error(f"Warning: Unexpected error updating account {creator_id}: {acc_general_err}")
             except Exception as e:
                 error_message = f"Failed to create final video document for {uncompressed_file_id}: {e}"
                 context.error(error_message)

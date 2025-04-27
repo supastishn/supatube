@@ -14,6 +14,7 @@ import json # For handling JSON data
 
 # --- Configuration ---
 DATABASE_ID = "database"
+ACCOUNTS_COLLECTION_ID = "accounts" 
 VIDEO_PROCESSING_COLLECTION_ID = "video-processing"
 VIDEOS_COLLECTION_ID = "videos"
 VIDEOS_UNCOMPRESSED_BUCKET_ID = "videos-uncompressed"

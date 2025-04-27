@@ -642,6 +642,7 @@ const VideoDetail = () => {
   useEffect(() => {
     if (currentUser && video?.channel?.creatorUserId) {
       const creatorId = video.channel.creatorUserId;
+      // Use subscribingTo from context which now comes from user_subscriptions collection
       const currentlySubscribed = (currentUser.subscribingTo || []).includes(creatorId);
       setIsSubscribed(currentlySubscribed);
       console.log(`[VideoDetail Sub Effect] Initial subscription status for ${creatorId}: ${currentlySubscribed}`);

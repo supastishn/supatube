@@ -607,14 +607,6 @@
                     "default": null
                 },
                 {
-                    "key": "subscribingTo",
-                    "type": "string",
-                    "required": true,
-                    "array": true,
-                    "size": 999999,
-                    "default": []
-                },
-                {
                     "key": "videosLiked",
                     "type": "string",
                     "required": true,
@@ -796,6 +788,27 @@
                     "min": 0,
                     "max": 999999999,
                     "default": 0
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "user_subscriptions",
+            "$permissions": [
+                "read(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "User Subscriptions",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "subscribedToChannelIds",
+                    "type": "string",
+                    "required": true,
+                    "array": true,
+                    "size": 999999,
+                    "default": []
                 }
             ],
             "indexes": []

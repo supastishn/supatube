@@ -13,6 +13,7 @@ DATABASE_ID = "database"
 ACCOUNTS_COLLECTION_ID = "accounts"
 CHANNEL_STATS_COLLECTION_ID = "channel_stats"
 ACCOUNT_INTERACTIONS_COLLECTION_ID = "account_interactions"
+USER_SUBSCRIPTIONS_COLLECTION_ID = "user_subscriptions"
 MAX_PROCESSING_LIMIT = 50  # Number of interactions to process per run
 
 def main(context):
@@ -104,47 +105,73 @@ def main(context):
 
                 context.log(f"Processing Action: {action}, Subscriber: {subscriber_id}, Target: {creator_id}")
 
-                # --- Fetch Subscriber's Account Document ---
+                # --- Fetch Subscriber's Subscriptions Document ---
+                create_subscription_doc = False
                 try:
-                    subscriber_doc = databases.get_document(DATABASE_ID, ACCOUNTS_COLLECTION_ID, subscriber_id)
-                    subscribing_to_list = subscriber_doc.get('subscribingTo', []) or []
+                    subscription_doc = databases.get_document(DATABASE_ID, USER_SUBSCRIPTIONS_COLLECTION_ID, subscriber_id)
+                    subscribing_to_list = subscription_doc.get('subscribedToChannelIds', []) or []
                     subscribing_to_set = set(subscribing_to_list)
                     is_currently_subscribed = creator_id in subscribing_to_set
                     context.log(f"Currently subscribed: {is_currently_subscribed}")
-
-                    count_change = 0
-                    new_subscription_state = is_currently_subscribed # Default to current state
-
-                    # --- Determine Necessary Changes ---
-                    if action == 'subscribe' and not is_currently_subscribed:
-                        count_change = 1
-                        new_subscription_state = True
-                        subscribing_to_set.add(creator_id)
-                    elif action == 'unsubscribe' and is_currently_subscribed:
-                        count_change = -1
-                        new_subscription_state = False
-                        subscribing_to_set.discard(creator_id)
+                except AppwriteException as e:
+                    if e.code == 404:
+                        # No subscriptions document exists yet, initialize with empty set
+                        subscribing_to_set = set()
+                        is_currently_subscribed = False
+                        create_subscription_doc = True
+                        context.log(f"No subscriptions document found for user {subscriber_id}. Will create if needed.")
                     else:
-                        # No change needed (e.g., subscribing when already subscribed)
-                        context.log("No change in subscription state required.")
+                        # Re-throw other errors
+                        context.error(f"Error fetching subscriptions document for {subscriber_id}: {e}")
+                        raise e
 
-                    # --- Update Subscriber's Document if State Changed ---
-                    subscription_updated = True
-                    if new_subscription_state != is_currently_subscribed:
-                        updated_subscribing_list = list(subscribing_to_set)
-                        context.log(f"Updating subscriber document {subscriber_id} with new list (size {len(updated_subscribing_list)})...")
-                        try:
+                count_change = 0
+                new_subscription_state = is_currently_subscribed # Default to current state
+
+                # --- Determine Necessary Changes ---
+                if action == 'subscribe' and not is_currently_subscribed:
+                    count_change = 1
+                    new_subscription_state = True
+                    subscribing_to_set.add(creator_id)
+                elif action == 'unsubscribe' and is_currently_subscribed:
+                    count_change = -1
+                    new_subscription_state = False
+                    subscribing_to_set.discard(creator_id)
+                else:
+                    # No change needed (e.g., subscribing when already subscribed)
+                    context.log("No change in subscription state required.")
+
+                # --- Update Subscriber's Document if State Changed ---
+                subscription_updated = True
+                if new_subscription_state != is_currently_subscribed:
+                    updated_subscribing_list = list(subscribing_to_set)
+                    context.log(f"Updating subscriber subscriptions {subscriber_id} with new list (size {len(updated_subscribing_list)})...")
+                    try:
+                        if create_subscription_doc:
+                            # Create new subscriptions document if it doesn't exist
+                            databases.create_document(
+                                database_id=DATABASE_ID,
+                                collection_id=USER_SUBSCRIPTIONS_COLLECTION_ID,
+                                document_id=subscriber_id,
+                                data={'subscribedToChannelIds': updated_subscribing_list},
+                                permissions=[
+                                    Permission.read(Role.user(subscriber_id))  # Only user can read their subscriptions
+                                ]
+                            )
+                            context.log(f"Created new subscriptions document for {subscriber_id}")
+                        else:
+                            # Update existing subscriptions document
                             databases.update_document(
                                 database_id=DATABASE_ID,
-                                collection_id=ACCOUNTS_COLLECTION_ID,
+                                collection_id=USER_SUBSCRIPTIONS_COLLECTION_ID,
                                 document_id=subscriber_id,
-                                data={'subscribingTo': updated_subscribing_list}
+                                data={'subscribedToChannelIds': updated_subscribing_list}
                             )
-                            context.log(f"Subscriber document {subscriber_id} updated.")
-                        except AppwriteException as update_err:
-                            context.error(f"Failed to update subscriber document {subscriber_id}: {update_err}")
-                            subscription_updated = False
-                            raise update_err  # Re-raise to be caught by the outer try-except
+                            context.log(f"Updated subscriptions document for {subscriber_id}")
+                    except AppwriteException as update_err:
+                        context.error(f"Failed to update subscriptions document {subscriber_id}: {update_err}")
+                        subscription_updated = False
+                        raise update_err  # Re-raise to be caught by the outer try-except
                     
                     # --- Update Channel Stats if Count Changed ---
                     stats_updated = True

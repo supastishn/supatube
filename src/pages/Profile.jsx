@@ -111,6 +111,7 @@ const Profile = () => {
   // Effect to check if current user is subscribed to this profile
   useEffect(() => {
     if (currentUser && userId && !isOwnProfile) {
+      // Use the subscribingTo array from currentUser context which now comes from user_subscriptions
       const currentlySubscribed = (currentUser.subscribingTo || []).includes(userId);
       setIsSubscribed(currentlySubscribed);
       console.log(`[Profile] Initial subscription status for ${userId}: ${currentlySubscribed}`);

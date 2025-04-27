@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }) => {
     let accountDoc = null;
     let accountVideosLiked = []; // Initialize as empty arrays
     let accountVideosDisliked = [];
+    let subscribedToChannelIds = []; // Initialize subscription list
 
     // Fetch core account details first
     try {
@@ -48,11 +49,29 @@ export const AuthProvider = ({ children }) => {
         }
         // Proceed even if account doc doesn't exist yet, defaults will be used
     }
+    
+    // Fetch user's subscriptions from dedicated collection
+    try {
+        const subscriptionsDoc = await databases.getDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userSubscriptionsCollectionId,
+            userId
+        );
+        subscribedToChannelIds = subscriptionsDoc?.subscribedToChannelIds || [];
+        console.log(`[AuthContext] Fetched subscriptions: ${subscribedToChannelIds.length} channels`);
+    } catch (error) {
+        if (error.code !== 404) {
+            console.error("Failed to fetch user subscriptions:", error);
+        } else {
+            console.log(`[AuthContext] No subscriptions document found for ${userId}, using empty array.`);
+        }
+        // Default to empty array if document doesn't exist or error occurs
+    }
 
     return {
         bio: accountDoc?.bio || '', // Default if doc or field is missing
         profileImageUrl: accountDoc?.profileImageUrl || null,
-        subscribingTo: accountDoc?.subscribingTo || [],
+        subscribingTo: subscribedToChannelIds, // Use the securely stored subscriptions list
         // --- Return the arrays fetched from account ---
         initialLikedIds: accountVideosLiked,
         initialDislikedIds: accountVideosDisliked
@@ -104,7 +123,7 @@ export const AuthProvider = ({ children }) => {
 
       if (newAccount) {
         try {
-          // Create account document WITH NEW ARRAYS
+          // Create account document WITHOUT subscribingTo array
           await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.accountsCollectionId,
@@ -113,7 +132,6 @@ export const AuthProvider = ({ children }) => {
               name: name,
               bio: '',
               profileImageUrl: null,
-              subscribingTo: [],
               videosLiked: [], // Add required empty array
               videosDisliked: [] // Add required empty array
             },
@@ -124,6 +142,26 @@ export const AuthProvider = ({ children }) => {
             ]
           );
           console.log(`[AuthContext] Successfully created account details document for user ${userId}.`);
+          
+          // Create empty user subscriptions document
+          try {
+            await databases.createDocument(
+              appwriteConfig.databaseId,
+              appwriteConfig.userSubscriptionsCollectionId,
+              userId, // Use user ID as document ID
+              {
+                subscribedToChannelIds: [] // Initialize with empty array
+              },
+              [ // Only allow user to read their own subscriptions
+                Permission.read(Role.user(userId))
+              ]
+            );
+            console.log(`[AuthContext] Successfully created subscriptions document for user ${userId}.`);
+          } catch (subsError) {
+            console.error("Failed to create user subscriptions document:", subsError);
+            // Continue with login anyway
+          }
+          
         } catch (docError) {
           console.error("Failed to create account details document:", docError);
           // Proceed to login anyway

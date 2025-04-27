@@ -9,8 +9,8 @@ import { formatViews } from '../utils/formatters'; // Add this line
 
 const Profile = () => {
   const { userId } = useParams(); // Get userId from URL
-  const navigate = useNavigate(); // Add navigate for redirection
-  const { user: currentUser, loading: authLoading } = useAuth(); // Get currently logged-in user and auth loading state
+  const navigate = useNavigate();
+  const { user: currentUser, accountDetails, loading: authLoading } = useAuth(); // Get user, details, loading state
 
   const [userData, setUserData] = useState(null);
   const [userVideos, setUserVideos] = useState([]);
@@ -110,15 +110,16 @@ const Profile = () => {
 
   // Effect to check if current user is subscribed to this profile
   useEffect(() => {
-    if (currentUser && userId && !isOwnProfile) {
-      // Use the subscribingTo array from currentUser context which now comes from user_subscriptions
-      const currentlySubscribed = (currentUser.subscribingTo || []).includes(userId);
+    // Check only if auth is loaded, user exists, details are loaded, and it's not the user's own profile
+    if (!authLoading && currentUser && accountDetails && userId && !isOwnProfile) {
+      // Use the subscribingTo array from accountDetails (populated by AuthContext)
+      const currentlySubscribed = (accountDetails.subscribingTo || []).includes(userId);
       setIsSubscribed(currentlySubscribed);
       console.log(`[Profile] Initial subscription status for ${userId}: ${currentlySubscribed}`);
     } else {
       setIsSubscribed(false);
     }
-  }, [currentUser, userId, isOwnProfile]); // Re-run when user or profile ID changes
+  }, [currentUser, accountDetails, userId, isOwnProfile, authLoading]); // Add accountDetails and authLoading to dependencies
 
   // Handle subscribe/unsubscribe
   const handleSubscribeToggle = async () => {

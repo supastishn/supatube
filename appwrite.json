@@ -163,9 +163,7 @@
         },
         {
             "$id": "subscriptions-manager",
-            "execute": [
-                "any"
-            ],
+            "execute": [],
             "name": "subscriptions-manager",
             "enabled": true,
             "logging": true,
@@ -253,7 +251,8 @@
         {
             "$id": "account_interactions",
             "$permissions": [
-                "create(\"users\")"
+                "create(\"users\")",
+                "read(\"users\")"
             ],
             "databaseId": "database",
             "name": "Account Interactions",
@@ -264,15 +263,17 @@
                     "key": "type",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 15,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "targetAccountId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 }
             ],
             "indexes": []
@@ -291,44 +292,49 @@
                     "key": "videoId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "commentText",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 2000,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "parentCommentId",
                     "type": "string",
                     "required": false,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "temporaryClientId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "type",
                     "type": "string",
                     "required": false,
+                    "array": false,
                     "size": 10,
-                    "default": "create",
-                    "array": false
+                    "default": "create"
                 },
                 {
                     "key": "commentIdToDelete",
                     "type": "string",
                     "required": false,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 }
             ],
             "indexes": []
@@ -347,52 +353,58 @@
                     "key": "title",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "description",
                     "type": "string",
                     "required": false,
-                    "size": 1000,
-                    "array": false
-                },
-                {
-                    "key": "duration",
-                    "type": "integer",
-                    "required": false,
-                    "min": 0,
                     "array": false,
+                    "size": 1000,
                     "default": null
                 },
                 {
                     "key": "uncompressedFileId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "thumbnailId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "status",
                     "type": "string",
                     "required": false,
+                    "array": false,
                     "size": 15,
-                    "default": "pending",
-                    "array": false
+                    "default": "pending"
                 },
                 {
                     "key": "errorMessage",
                     "type": "string",
                     "required": false,
+                    "array": false,
                     "size": 500,
-                    "array": false
+                    "default": null
+                },
+                {
+                    "key": "duration",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 9223372036854775807,
+                    "default": null
                 }
             ],
             "indexes": [
@@ -423,22 +435,25 @@
                     "key": "userId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "videoId",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 100,
-                    "array": false
+                    "default": null
                 },
                 {
                     "key": "state",
                     "type": "string",
                     "required": true,
+                    "array": false,
                     "size": 10,
-                    "array": false
+                    "default": null
                 }
             ],
             "indexes": [
@@ -472,6 +487,7 @@
             "$id": "videos",
             "$permissions": [
                 "read(\"guests\")",
+                "create(\"users\")",
                 "read(\"users\")"
             ],
             "databaseId": "database",
@@ -558,6 +574,7 @@
             "$permissions": [
                 "create(\"users\")",
                 "read(\"users\")",
+                "create(\"guests\")",
                 "read(\"guests\")"
             ],
             "databaseId": "database",
@@ -595,7 +612,7 @@
                     "required": true,
                     "array": true,
                     "size": 999999,
-                    "default": []
+                    "default": null
                 },
                 {
                     "key": "videosLiked",
@@ -603,7 +620,7 @@
                     "required": true,
                     "array": true,
                     "size": 100,
-                    "default": []
+                    "default": null
                 },
                 {
                     "key": "videosDisliked",
@@ -611,7 +628,7 @@
                     "required": true,
                     "array": true,
                     "size": 100,
-                    "default": []
+                    "default": null
                 }
             ],
             "indexes": []
@@ -674,12 +691,13 @@
             "$id": "video_interactions",
             "$permissions": [
                 "create(\"users\")",
-                "read(\"users\")"
+                "read(\"users\")",
+                "read(\"any\")"
             ],
             "databaseId": "database",
             "name": "Video Interactions",
             "enabled": true,
-            "documentSecurity": true,
+            "documentSecurity": false,
             "attributes": [
                 {
                     "key": "videoId",
@@ -780,6 +798,55 @@
                     "default": 0
                 }
             ],
+            "indexes": []
+        },
+        {
+            "$id": "comment-interactions",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Comment Interactions",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null
+                },
+                {
+                    "key": "commentText",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 2000,
+                    "default": null
+                },
+                {
+                    "key": "parentId",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 100,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "comments",
+            "$permissions": [
+                "read(\"any\")"
+            ],
+            "databaseId": "database",
+            "name": "Comments",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [],
             "indexes": []
         }
     ],

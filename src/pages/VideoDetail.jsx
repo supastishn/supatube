@@ -548,22 +548,24 @@ const VideoDetail = () => {
   // --- Realtime updates subscription ---
   useEffect(() => {
     if (!videoId) return; // Don't subscribe if no video ID
-
+    
+    console.log(`[Realtime/${videoId}] Setting up subscriptions (like/dislike counts subscription is now REMOVED)...`);
+    
     // --- Subscribe to Video Counts ---
-    const countsCollection = `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.videoCountsCollectionId}.documents.${videoId}`;
-    const countsUnsubscribe = client.subscribe(countsCollection, (response) => {
-        console.log("Realtime Counts Update Received:", response.payload);
-        // Update state based on payload, handle potential nulls gracefully
-        setLikeCount(response.payload.likeCount ?? likeCount);
-        setDislikeCount(response.payload.dislikeCount ?? dislikeCount);
-        setVideoCommentCount(response.payload.commentCount ?? videoCommentCount);
-    });
-    console.log(`Realtime: Subscribed to ${countsCollection}`);
+    // const countsCollection = `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.videoCountsCollectionId}.documents.${videoId}`;
+    // const countsUnsubscribe = client.subscribe(countsCollection, (response) => {
+    //     console.log("Realtime Counts Update Received:", response.payload);
+    //     // Update state based on payload, handle potential nulls gracefully
+    //     setLikeCount(response.payload.likeCount ?? likeCount);
+    //     setDislikeCount(response.payload.dislikeCount ?? dislikeCount);
+    //     setVideoCommentCount(response.payload.commentCount ?? videoCommentCount);
+    // });
+    // console.log(`Realtime: Subscribed to ${countsCollection}`);
 
     // Cleanup function: Unsubscribe when component unmounts or videoId changes
     return () => {
         console.log("Realtime: Unsubscribing from updates...");
-        countsUnsubscribe();
+        // countsUnsubscribe();
     };
   // Dependencies ensure re-subscription if videoId changes
   }, [videoId, likeCount, dislikeCount, videoCommentCount]); // Include states potentially updated by the callback

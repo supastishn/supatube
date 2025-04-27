@@ -7,6 +7,7 @@ from appwrite.role import Role
 from appwrite.input_file import InputFile
 from appwrite.query import Query
 import os
+import glob # For finding the apk file
 import subprocess # For running FFmpeg
 import traceback # For detailed error logging
 import json # For handling JSON data
@@ -35,9 +36,9 @@ TMP_OUTPUT_DIR = '/tmp/output'
 
 def get_video_duration_ffmpeg(file_path, context):
     """Gets video duration using ffprobe."""
-    ffprobe_path = os.path.expanduser('~/ffprobe') # Resolve ~ to home directory
+    ffprobe_path = 'ffprobe' # Assume ffprobe is in PATH after runtime installation
     ffprobe_command = [
-        ffprobe_path,                      # Use path in home directory
+        ffprobe_path,
         '-v', 'error',                     # Only show errors
         '-show_entries', 'format=duration', # Get duration from format section
         '-of', 'default=noprint_wrappers=1:nokey=1', # Output only the value
@@ -57,7 +58,7 @@ def get_video_duration_ffmpeg(file_path, context):
         context.log(f"Calculated duration: {duration_int} seconds")
         return duration_int
     except FileNotFoundError:
-        context.error(f"ffprobe command not found at {ffprobe_path}. Ensure static binary was extracted correctly.")
+        context.error(f"ffprobe command not found at '{ffprobe_path}'. Was it installed correctly at runtime?")
         raise
     except subprocess.CalledProcessError as e:
         context.error(f"ffprobe failed with exit code {e.returncode}.")
@@ -74,11 +75,11 @@ def get_video_duration_ffmpeg(file_path, context):
 
 def run_ffmpeg(input_path, output_path, context):
     """Runs the FFmpeg compression command."""
-    ffmpeg_path = os.path.expanduser('~/ffmpeg') # Resolve ~ to home directory
+    ffmpeg_path = 'ffmpeg' # Assume ffmpeg is in PATH after runtime installation
     context.log(f"Starting FFmpeg compression: {input_path} -> {output_path}")
     # Scale: -2 means calculate width automatically to maintain aspect ratio for the given height
     ffmpeg_command = [
-        ffmpeg_path,                           # Use path in home directory
+        ffmpeg_path,
         '-i', input_path,
         '-vf', f"scale=-2:{FFMPEG_RESOLUTION}", # Scale to target height
         '-r', FFMPEG_FRAMERATE,                 # Set frame rate
@@ -98,7 +99,7 @@ def run_ffmpeg(input_path, output_path, context):
         context.log(f"FFmpeg stderr: {result.stderr[-500:]}") # Log last part of stderr
         return True
     except FileNotFoundError:
-        context.error(f"ffmpeg command not found at {ffmpeg_path}. Ensure static binary was extracted correctly.")
+        context.error(f"ffmpeg command not found at '{ffmpeg_path}'. Was it installed correctly at runtime?")
         return False
     except subprocess.CalledProcessError as e:
         context.error(f"FFmpeg failed with exit code {e.returncode}.")
@@ -113,6 +114,39 @@ def run_ffmpeg(input_path, output_path, context):
 
 def main(context):
     context.log("--- Video Manager Processing Start ---")
+
+    # --- Dynamically install fetched ffmpeg apk at runtime ---
+    try:
+        context.log("Attempting to find ffmpeg apk(s) at /usr/local/server/src/function/*.apk...")
+        # Use glob to find the specific apk file(s) provided within the function's deployment
+        apk_files = glob.glob('/usr/local/server/src/function/*.apk')
+        if not apk_files:
+            raise FileNotFoundError("No *.apk file found in /usr/local/server/src/function/. Ensure 'apk fetch ffmpeg ffmpeg-libs' is in build commands.")
+
+        context.log(f"Found {len(apk_files)} apk file(s) to install: {apk_files}")
+
+        # Iterate and install each found apk file
+        for apk_path in apk_files:
+            apk_command = ['apk', 'add', '--allow-untrusted', apk_path]
+            context.log(f"Executing apk command: {' '.join(apk_command)}")
+            install_result = subprocess.run(apk_command, check=True, capture_output=True, text=True)
+            context.log(f"Successfully installed {apk_path}.")
+            context.log(f"apk stdout: {install_result.stdout}")
+            if install_result.stderr: # Log stderr only if it's not empty
+                context.log(f"apk stderr: {install_result.stderr}")
+
+    except FileNotFoundError as e:
+        context.error(f"FFmpeg installation failed: {e}")
+        return context.res.json({"success": False, "message": str(e)}, 500)
+    except subprocess.CalledProcessError as e:
+        context.error(f"apk add command failed with exit code {e.returncode}.")
+        context.error(f"apk stdout: {e.stdout}")
+        context.error(f"apk stderr: {e.stderr}")
+        return context.res.json({"success": False, "message": f"Failed to install ffmpeg from local apk: {e.stderr}"}, 500)
+    except Exception as e:
+        context.error(f"An unexpected error occurred during ffmpeg installation: {e}")
+        context.error(traceback.format_exc())
+        return context.res.json({"success": False, "message": f"Unexpected error installing ffmpeg: {str(e)}"}, 500)
 
     # --- Environment & Auth Check ---
     api_endpoint = os.environ.get("APPWRITE_FUNCTION_API_ENDPOINT")

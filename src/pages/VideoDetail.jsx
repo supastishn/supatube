@@ -203,7 +203,7 @@ const VideoDetail = () => {
     setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
 
     try {
-      const result = await createSubscriptionInteraction(creatorId, action);
+      const result = await createSubscriptionInteraction(creatorId, action, currentUser.$id);
       console.log('Subscription interaction created:', result);
     } catch (error) {
       console.error('Subscription interaction failed:', error);

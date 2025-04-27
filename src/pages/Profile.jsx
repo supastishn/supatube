@@ -140,7 +140,7 @@ const Profile = () => {
     setSubscriberCount(prev => Math.max(0, prev + (action === 'subscribe' ? 1 : -1)));
 
     try {
-      await createSubscriptionInteraction(userId, action);
+      await createSubscriptionInteraction(userId, action, currentUser.$id);
     } catch (error) {
       console.error('Subscription interaction failed:', error);
       // Revert optimistic updates

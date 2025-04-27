@@ -19,7 +19,7 @@ import SearchResults from './pages/SearchResults';
 const Trending = () => <div>Trending Page</div>;
 const Subscriptions = () => <div>Subscriptions Page</div>;
 const History = () => <div>History Page</div>;
-const YourVideos = () => <div>Your Videos Page</div>;
+import YourVideos from './pages/YourVideos'; // Import the actual component
 const WatchLater = () => <div>Watch Later Page</div>;
 import LikedVideos from './pages/LikedVideos'; // Import the actual component
 

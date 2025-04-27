@@ -115,34 +115,31 @@ def run_ffmpeg(input_path, output_path, context):
 def main(context):
     context.log("--- Video Manager Processing Start ---")
 
-    # --- Dynamically install fetched ffmpeg apk at runtime ---
+    # --- Dynamically install ffmpeg using apk add at runtime ---
     try:
-        context.log("Attempting to find ffmpeg apk(s) at /usr/local/server/src/function/*.apk...")
-        # Use glob to find the specific apk file(s) provided within the function's deployment
-        apk_files = glob.glob('/usr/local/server/src/function/*.apk')
-        if not apk_files:
-            raise FileNotFoundError("No *.apk file found in /usr/local/server/src/function/. Ensure 'apk fetch ffmpeg ffmpeg-libs' is in build commands.")
+        # Update package list first (good practice)
+        apk_update_command = ['apk', 'update']
+        context.log(f"Executing apk command: {' '.join(apk_update_command)}")
+        update_result = subprocess.run(apk_update_command, check=True, capture_output=True, text=True)
+        context.log("APK package list updated.")
 
-        context.log(f"Found {len(apk_files)} apk file(s) to install: {apk_files}")
-
-        # Iterate and install each found apk file
-        for apk_path in apk_files:
-            apk_command = ['apk', 'add', '--allow-untrusted', apk_path]
-            context.log(f"Executing apk command: {' '.join(apk_command)}")
-            install_result = subprocess.run(apk_command, check=True, capture_output=True, text=True)
-            context.log(f"Successfully installed {apk_path}.")
-            context.log(f"apk stdout: {install_result.stdout}")
-            if install_result.stderr: # Log stderr only if it's not empty
-                context.log(f"apk stderr: {install_result.stderr}")
+        # Install ffmpeg
+        apk_command = ['apk', 'add', 'ffmpeg']
+        context.log(f"Executing apk command: {' '.join(apk_command)}")
+        install_result = subprocess.run(apk_command, check=True, capture_output=True, text=True)
+        context.log("ffmpeg installed successfully via apk add.")
+        context.log(f"apk stdout: {install_result.stdout}")
+        if install_result.stderr: # Log stderr only if it's not empty
+            context.log(f"apk stderr: {install_result.stderr}")
 
     except FileNotFoundError as e:
         context.error(f"FFmpeg installation failed: {e}")
         return context.res.json({"success": False, "message": str(e)}, 500)
     except subprocess.CalledProcessError as e:
-        context.error(f"apk add command failed with exit code {e.returncode}.")
+        context.error(f"apk command failed with exit code {e.returncode}.")
         context.error(f"apk stdout: {e.stdout}")
         context.error(f"apk stderr: {e.stderr}")
-        return context.res.json({"success": False, "message": f"Failed to install ffmpeg from local apk: {e.stderr}"}, 500)
+        return context.res.json({"success": False, "message": f"Failed to install ffmpeg via apk: {e.stderr}"}, 500)
     except Exception as e:
         context.error(f"An unexpected error occurred during ffmpeg installation: {e}")
         context.error(traceback.format_exc())

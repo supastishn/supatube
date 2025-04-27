@@ -17,13 +17,13 @@ const Sidebar = ({ isOpen, isMobile, closeSidebar }) => {
 
   // SVG Path data for icons (Consider moving to a separate file or helper)
   const icons = {
-    home: <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>,
-    trending: <path d="M17.5 15v- organizações 5.5c0-.83-.67-1.5-1.5-1.5h-7c-.83 0-1.5.67-1.5 1.5V15H4V6.5C4 5.67 4.67 5 5.5 5h11c.83 0 1.5.67 1.5 1.5V15h-3.5zM16 16h3v3h-3v-3zm-5 0h3v3h-3v-3zm-5 0h3v3H6v-3z"></path>, // Placeholder icon
-    subscriptions: <path d="M20 8H4V6h16v2zm-2-6H6v2h12V2zM4 18v-2h16v2H4zm18-7H2v2h20v-2z"></path>,
-    history: <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.41 1.41C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"></path>,
-    yourVideos: <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path>, // Placeholder icon
-    watchLater: <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.03 14.53l-4.78-3.03v-6h1.5v5.21l4.14 2.62-1.06 1.2z"></path>,
-    likedVideos: <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-1.91l-.01-.01L23 10z"></path>,
+    home: <path d="M12 5.69l5 4.5V18h-2v-6H9v6H7v-7.81l5-4.5M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/>, // Simple House
+    trending: <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>, // Simple Arrow/Line Graph
+    subscriptions: <path d="M20 8H4V6h16v2zm-2-6H6v2h12V2zM4 18v-2h16v2H4zm18-7H2v2h20v-2z"/>, // Stack/List (Keep existing - generic enough)
+    history: <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.41 1.41C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>, // Clock (Keep existing - generic)
+    yourVideos: <path d="M8 5v14l11-7z"/>, // Simple Play Button
+    watchLater: <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.03 14.53l-4.78-3.03v-6h1.5v5.21l4.14 2.62-1.06 1.2z"/>, // Clock (Keep existing - generic)
+    likedVideos: <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>, // Simple Heart
   };
 
   // Render a single sidebar navigation item

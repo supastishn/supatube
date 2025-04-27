@@ -226,13 +226,13 @@ def main(context):
                         context.log(f"Interaction {interaction_id} partially processed but document not deleted.")
                         failed_count += 1
 
-                except AppwriteException as e:
-                    if e.code == 404 and e.message.__contains__(subscriber_id):
-                        context.error(f"Subscriber account document not found for {subscriber_id}. Cannot process interaction {interaction_id}.")
-                    else:
-                        context.error(f"Database error processing interaction {interaction_id}: {e.message}")
-                    failed_count += 1
-                    # Don't delete the interaction document on failure
+            except AppwriteException as e:
+                if e.code == 404 and e.message.__contains__(subscriber_id):
+                    context.error(f"Subscriber account document not found for {subscriber_id}. Cannot process interaction {interaction_id}.")
+                else:
+                    context.error(f"Database error processing interaction {interaction_id}: {e.message}")
+                failed_count += 1
+                # Don't delete the interaction document on failure
                     
             except Exception as e:
                 context.error(f"Error processing interaction {interaction_id}: {e}")

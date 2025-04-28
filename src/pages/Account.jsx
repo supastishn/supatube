@@ -54,7 +54,8 @@ const Account = () => {
           profileImageUrl: profileImageUrl,
           // --- Use Sets from context for like/dislike arrays ---
           videosLiked: Array.from(likedVideoIds),    // Use Set from context
-          videosDisliked: Array.from(dislikedVideoIds) // Use Set from context
+          videosDisliked: Array.from(dislikedVideoIds), // Use Set from context
+          // *** DO NOT include videosUploaded or watchLaterVideos here for UPDATE ***
           // *** DO NOT include videosUploaded here ***
         };
         
@@ -76,7 +77,8 @@ const Account = () => {
                 user.$id, // Use user's ID as document ID
                 { // *** When creating, include videosUploaded explicitly ***
                   ...accountDataPayload,
-                  videosUploaded: [] // Initialize empty array
+                  videosUploaded: [], // Initialize empty array
+                  watchLaterVideos: [] // Initialize watch later empty array
                 },
                 [
                   Permission.read(Role.user(user.$id)),   // User can read their own doc

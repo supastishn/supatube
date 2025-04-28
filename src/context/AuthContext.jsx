@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   });
   const [likedVideoIds, setLikedVideoIds] = useState(new Set());
   const [dislikedVideoIds, setDislikedVideoIds] = useState(new Set());
+  const [watchLaterVideoIds, setWatchLaterVideoIds] = useState(new Set()); // Add watch later state
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }) => {
     let accountDoc = null;
     let accountVideosLiked = []; // Initialize as empty arrays
     let accountVideosDisliked = [];
+    let accountWatchLater = [];
     let subscribedToChannelIds = []; // Initialize subscription list
 
     // Fetch core account details first
@@ -40,9 +42,9 @@ export const AuthProvider = ({ children }) => {
         // --- Get arrays directly from accountDoc ---
         accountVideosLiked = accountDoc?.videosLiked || [];
         accountVideosDisliked = accountDoc?.videosDisliked || [];
-        // --- Fetch videosUploaded ---
         const accountVideosUploaded = accountDoc?.videosUploaded || [];
-        console.log(`[AuthContext] Fetched account arrays: Liked(${accountVideosLiked.length}), Disliked(${accountVideosDisliked.length}), Uploaded(${accountVideosUploaded.length})`);
+        accountWatchLater = accountDoc?.watchLaterVideos || [];
+        console.log(`[AuthContext] Fetched account arrays: Liked(${accountVideosLiked.length}), Disliked(${accountVideosDisliked.length}), Uploaded(${accountVideosUploaded.length}), WatchLater(${accountWatchLater.length})`);
 
     } catch (error) {
         if (error.code !== 404) {
@@ -78,7 +80,8 @@ export const AuthProvider = ({ children }) => {
         videosUploaded: accountDoc?.videosUploaded || [],
         // --- Return the arrays fetched from account ---
         initialLikedIds: accountVideosLiked,
-        initialDislikedIds: accountVideosDisliked
+        initialDislikedIds: accountVideosDisliked,
+        initialWatchLaterIds: accountWatchLater
     };
   };
 
@@ -99,6 +102,7 @@ export const AuthProvider = ({ children }) => {
         // --- Initialize Sets directly from the fetched account arrays ---
         setLikedVideoIds(new Set(userData.initialLikedIds));
         setDislikedVideoIds(new Set(userData.initialDislikedIds));
+        setWatchLaterVideoIds(new Set(userData.initialWatchLaterIds)); // Initialize watch later set
 
         console.log("[AuthContext] User status checked, state updated from account arrays.");
 
@@ -110,6 +114,7 @@ export const AuthProvider = ({ children }) => {
         setAccountDetails({ bio: '', profileImageUrl: null, subscribingTo: [], videosUploaded: [] }); // Reset details including videosUploaded
         setLikedVideoIds(new Set()); // Reset sets
         setDislikedVideoIds(new Set());
+        setWatchLaterVideoIds(new Set()); // Reset watch later set
     } finally {
         setLoading(false);
     }
@@ -139,7 +144,8 @@ export const AuthProvider = ({ children }) => {
               profileImageUrl: null,
               videosLiked: [],
               videosDisliked: [],
-              videosUploaded: []
+              videosUploaded: [],
+              watchLaterVideos: []
             },
             [ // Permissions
               Permission.read(Role.user(userId)),
@@ -199,6 +205,10 @@ export const AuthProvider = ({ children }) => {
       // Reset states on logout
       await account.deleteSession('current');
       setUser(null);
+      setAccountDetails({ bio: '', profileImageUrl: null, subscribingTo: [], videosUploaded: [] });
+      setLikedVideoIds(new Set());
+      setDislikedVideoIds(new Set());
+      setWatchLaterVideoIds(new Set()); // Reset watch later on logout
       navigate('/sign-in');
     } catch (error) {
       // Logout error
@@ -227,6 +237,7 @@ export const AuthProvider = ({ children }) => {
       // Ensure liked/disliked Sets are also updated from the fresh fetch
       setLikedVideoIds(new Set(userData.initialLikedIds));
       setDislikedVideoIds(new Set(userData.initialDislikedIds));
+      setWatchLaterVideoIds(new Set(userData.initialWatchLaterIds)); // Refresh watch later set
 
       console.log("[AuthContext] User profile context refreshed.");
       // Return combined data including the core account info and fetched details
@@ -263,7 +274,6 @@ export const AuthProvider = ({ children }) => {
     });
      console.log(`[AuthContext Optimistic] Updated client state sets for ${videoId}, action ${action}`);
   };
-
   // --- Add updateAccountLikeDislikeArrays ---
   const updateAccountLikeDislikeArrays = async (videoId, action) => {
     if (!user) {
@@ -322,12 +332,57 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // --- Add toggleWatchLater function ---
+  const toggleWatchLater = async (videoId) => {
+    if (!user) {
+      console.warn("[AuthContext] Cannot toggle Watch Later: User not logged in.");
+      // Consider navigating to sign-in here
+      return;
+    }
+    console.log(`[AuthContext] Toggling Watch Later for video ${videoId}`);
+
+    // 1. Optimistic UI Update
+    let newSet;
+    setWatchLaterVideoIds(currentSet => {
+      newSet = new Set(currentSet);
+      if (newSet.has(videoId)) {
+        newSet.delete(videoId);
+      } else {
+        newSet.add(videoId);
+      }
+      console.log(`[AuthContext Optimistic] Watch Later set updated. Size: ${newSet.size}`);
+      return newSet;
+    });
+
+    // 2. Update Backend Document
+    try {
+      const updatedWatchLaterArray = Array.from(newSet);
+      await databases.updateDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.accountsCollectionId,
+        user.$id,
+        {
+          watchLaterVideos: updatedWatchLaterArray,
+          // Include other required arrays to prevent overwriting
+          videosLiked: Array.from(likedVideoIds),
+          videosDisliked: Array.from(dislikedVideoIds)
+        }
+      );
+      console.log(`[AuthContext] Successfully updated 'watchLaterVideos' for user ${user.$id}`);
+    } catch (error) {
+      console.error(`[AuthContext] Failed to update 'watchLaterVideos' for user ${user.$id}:`, error);
+      // TODO: Optionally revert optimistic update here if backend fails
+      // For now, just log the error. Next refresh will sync the state.
+    }
+  };
+
   const value = {
     user,
     accountDetails, // Expose details separately
     loading,
     likedVideoIds,      // Expose the Set
     dislikedVideoIds,   // Expose the Set
+    watchLaterVideoIds, // Expose watch later set
     register,
     login,
     logout,
@@ -336,6 +391,7 @@ export const AuthProvider = ({ children }) => {
     refreshUserProfile, // Expose the renamed function
     updateClientVideoStates, // Keep this for immediate UI update
     updateAccountLikeDislikeArrays, // Expose the new function
+    toggleWatchLater, // Expose the new watch later function
     account, // Keep access to account service if needed elsewhere
   };
 

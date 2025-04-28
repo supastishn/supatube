@@ -49,7 +49,7 @@ const formatTimeAgo = (dateString) => {
 
 const VideoDetail = () => {
   const { id: videoId } = useParams(); // Get video ID from URL parameter
-  const { user: currentUser, accountDetails, loading: authLoading, likedVideoIds, dislikedVideoIds, updateClientVideoStates, updateAccountLikeDislikeArrays, refreshUserProfile } = useAuth(); // Add accountDetails, authLoading, refreshUserProfile
+  const { user: currentUser, accountDetails, loading: authLoading, likedVideoIds, dislikedVideoIds, watchLaterVideoIds, updateClientVideoStates, updateAccountLikeDislikeArrays, refreshUserProfile, toggleWatchLater } = useAuth(); // Add watchLaterVideoIds, toggleWatchLater
   const navigate = useNavigate(); // For redirecting to sign-in
 
   const [video, setVideo] = useState(null);
@@ -537,9 +537,19 @@ const VideoDetail = () => {
     fetchAllCounts();
   }, [videoId]); // Re-run when videoId changes
 
-  // Determine button state directly in render
   const isLiked = currentUser && likedVideoIds.has(videoId);
   const isDisliked = currentUser && dislikedVideoIds.has(videoId);
+
+  // --- Determine if video is saved to Watch Later ---
+  const isSaved = currentUser && watchLaterVideoIds.has(videoId);
+  const handleSaveToggle = () => {
+      if (!currentUser) {
+          navigate('/sign-in', { state: { from: { pathname: `/videos/${videoId}` } } });
+      } else {
+          toggleWatchLater(videoId); // Call context function
+      }
+  };
+
   // Determine local status for count logic inside handleLikeDislike if needed
   let localLikeStatus = 0;
   if (isLiked) localLikeStatus = 1;
@@ -765,11 +775,18 @@ const VideoDetail = () => {
                 </svg>
                 Share
               </button>
-              {/* Save Button (Placeholder) */}
-              <button className="video-action-btn">
-                 <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
-                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"></path>
-                 </svg>
+              {/* --- Updated Save Button --- */}
+              <button
+                className={`video-action-btn save-btn ${isSaved ? 'active' : ''}`} // Add active class
+                onClick={handleSaveToggle} // Use the new handler
+                disabled={!currentUser} // Disable if not logged in (or handle via handler)
+                aria-pressed={isSaved}
+                title={isSaved ? 'Remove from Watch Later' : 'Save to Watch Later'}
+              >
+                <svg viewBox="0 0 24 24" height="20" width="20" fill="currentColor">
+                  {/* Use a filled clock for 'Saved', outline for 'Save' */}
+                  {isSaved ? <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/> : <path d="M14.97 16.95 10 13.87V7h2v5.76l3.77 2.26-.8 1.93zM12 3c-4.96 0-9 4.04-9 9s4.04 9 9 9 9-4.04 9-9-4.04-9-9-9m0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z"/>}
+                </svg>
                 Save
               </button>
 

@@ -94,6 +94,12 @@
   font-weight: 500;
   transition: background-color 0.2s;
 }
+.save-btn.active svg { /* Style the SVG when saved */
+    fill: var(--primary, red); /* Or your theme color */
+}
+.save-btn.active { /* Optional: Style button background when saved */
+    /* background-color: rgba(255, 0, 0, 0.1); */
+}
 
 .video-action-btn:hover {
     background-color: #e0e0e0;

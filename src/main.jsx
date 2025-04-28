@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { HashRouter as Router } from 'react-router-dom'; // Change import
 import { AuthProvider } from './context/AuthContext';
 import App from './App.jsx';
 import './index.css';
@@ -11,7 +11,7 @@ import eruda from 'eruda';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Router basename="/supatube">
+    <Router>
       <AuthProvider>
         <App />
       </AuthProvider>

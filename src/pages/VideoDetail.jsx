@@ -413,13 +413,9 @@ const VideoDetail = () => {
                 initialBase = creatorId; // Fallback to creatorId if name is unavailable/default
             }
 
-            try {
-                channelAvatarUrl = appwriteAvatars.getInitials(initialBase).href;
-            } catch (avatarError) {
-                // Error generating avatar
-                // Keep channelAvatarUrl as null or set a default placeholder if needed
-                channelAvatarUrl = 'https://via.placeholder.com/48?text=ERR'; // Basic error placeholder
-            }
+            // Use ui-avatars.com fallback (similar to VideoCard)
+            channelAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initialBase)}&background=random`;
+            console.log(`[Detail/${videoId}] Using initials avatar fallback URL: ${channelAvatarUrl}`);
         }
 
         // --- Map Appwrite data to video state object ---

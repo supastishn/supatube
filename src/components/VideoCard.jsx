@@ -62,7 +62,6 @@ const VideoCard = ({ video, isRelated = false }) => {
     uploadedAt,
     channel
   } = video || defaultVideo;
-  const viewCount = video?.viewCount ?? defaultVideo.viewCount; // Get viewCount safely
 
   const {
       id: channelId, // Rename to avoid conflict with video id

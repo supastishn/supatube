@@ -801,6 +801,39 @@
                     "min": 0,
                     "max": 999999999,
                     "default": 0
+                },
+                {
+                    "key": "viewCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 9999999999,
+                    "default": 0
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "pending_views",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "database",
+            "name": "Pending Views",
+            "enabled": true,
+            "documentSecurity": true,
+            "attributes": [
+                {
+                    "key": "videoId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null
                 }
             ],
             "indexes": []

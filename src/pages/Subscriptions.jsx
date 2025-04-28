@@ -65,12 +65,8 @@ const Subscriptions = () => {
         const channels = accountsResponse.documents.map(doc => {
           let avatarUrl = doc.profileImageUrl;
           if (!avatarUrl) {
-            // Fallback avatar generation
-            try {
-              avatarUrl = avatars.getInitials(doc.name || '?').href;
-            } catch {
-              avatarUrl = 'https://via.placeholder.com/88?text=?'; // Error fallback
-            }
+            // Use ui-avatars.com fallback
+            avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.name || '?')}&background=random`;
           }
 
           return {

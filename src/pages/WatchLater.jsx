@@ -81,7 +81,7 @@ const WatchLater = () => {
 
           // --- Final Avatar Fallback ---
           if (!channelAvatarUrl) {
-             channelAvatarUrl = avatars.getInitials(channelName || '?').href;
+             channelAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(channelName || '?')}&background=random`;
           }
 
           // --- Generate Thumbnail URL ---

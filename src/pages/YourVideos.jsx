@@ -95,8 +95,11 @@ const YourVideos = () => {
                   thumbnailUrl = storage.getFilePreview(
                     appwriteConfig.storageVideosBucketId,
                     doc.thumbnail_id
-                  ).href;
-                } catch {}
+                  ); // Get the URL object
+                } catch (previewError) {
+                    // Log or handle the error if preview generation fails
+                    console.warn(`[YourVideos/${doc.$id}] Error generating thumbnail preview:`, previewError);
+                }
               }
               
               // --- Fetch View Count ---

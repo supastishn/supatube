@@ -15,9 +15,9 @@ import Profile from './pages/Profile';
 import Account from './pages/Account';
 import NotFound from './pages/NotFound';
 import SearchResults from './pages/SearchResults';
-// Placeholder pages for routes mentioned in Sidebar
+ // Placeholder pages for routes mentioned in Sidebar
 const Trending = () => <div>Trending Page</div>;
-const Subscriptions = () => <div>Subscriptions Page</div>;
+import Subscriptions from './pages/Subscriptions'; // Import the actual component
 const History = () => <div>History Page</div>;
 import YourVideos from './pages/YourVideos'; // Import the actual component
 import WatchLater from './pages/WatchLater'; // Import the actual component

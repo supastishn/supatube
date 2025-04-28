@@ -621,6 +621,14 @@
                     "array": true,
                     "size": 100,
                     "default": null
+                },
+                {
+                    "key": "videosUploaded",
+                    "type": "string",
+                    "required": false,
+                    "array": true,
+                    "size": 100,
+                    "default": []
                 }
             ],
             "indexes": []

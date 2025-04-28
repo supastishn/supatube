@@ -8,6 +8,7 @@ import '../App.css'; // Use shared styles
 
 const YourVideos = () => {
   // Use useAuth to get user data and loading status
+  // *** Get accountDetails from AuthContext ***
   const { user: currentUser, accountDetails, loading: authLoading } = useAuth();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,9 +73,9 @@ const YourVideos = () => {
           // Construct the channel object (which is the current user)
           const channelInfo = {
             id: currentUser.$id, // Use current user's ID
-            name: accountDetails.name || currentUser.name || 'Your Channel', // Prioritize DB name
-            profileImageUrl: accountDetails.profileImageUrl || avatars.getInitials(currentUser.name || '?').href, // Prioritize DB image
-            bio: accountDetails.bio || '', // Use DB bio
+            name: accountDetails.name || currentUser.name || 'Your Channel', // Prioritize DB name from context
+            profileImageUrl: accountDetails.profileImageUrl || avatars.getInitials(currentUser.name || '?').href, // Prioritize DB image from context
+            bio: accountDetails.bio || '', // Use DB bio from context
             creatorUserId: currentUser.$id // Explicitly set creatorUserId
           };
 

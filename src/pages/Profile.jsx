@@ -50,28 +50,25 @@ const Profile = () => {
         );
         setUserData(userDoc); // Contains name, bio, profileImageUrl etc.
 
-        // 2. Fetch User's Videos (from 'videos' collection)
-        // Filter videos based on document permissions rather than creatorId
-        const videoResponse = await databases.listDocuments(
-          appwriteConfig.databaseId,
-          appwriteConfig.videosCollectionId,
-          [
-            // No creatorId filter here - we'll filter client-side based on permissions
-            Query.orderDesc('$createdAt'),   // Show newest videos first
-            Query.limit(100)                 // Limit to avoid excessive data transfer
-          ]
-        );
-        
-        // Filter documents client-side based on delete permission for the profile user
-        const userOwnedVideos = videoResponse.documents.filter(doc => {
-          // Check if the userId has a delete permission in the document
-          return doc.$permissions.some(perm => {
-            const deletePermRegex = new RegExp(`^delete\\("user:${userId}"\\)$`);
-            return deletePermRegex.test(perm);
-          });
-        });
-        
-        setUserVideos(userOwnedVideos);
+        // --- 2. Get video IDs from the fetched accounts document ---
+        const uploadedVideoIds = userDoc?.videosUploaded || [];
+        console.log(`[Profile] Fetched video IDs from accounts doc:`, uploadedVideoIds);
+
+        // 3. Fetch User's Videos if IDs were found
+        if (uploadedVideoIds.length > 0) {
+          const videoResponse = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.videosCollectionId,
+            [
+              Query.equal('$id', uploadedVideoIds), // *** Fetch by specific IDs ***
+              Query.limit(uploadedVideoIds.length), // Limit to the number of IDs
+              Query.orderDesc('$createdAt'),   // Show newest videos first
+            ]
+          );
+          setUserVideos(videoResponse.documents); // Set the fetched videos
+        } else {
+          setUserVideos([]); // Ensure it's empty if no IDs
+        }
 
         // Fetch subscriber count
         try {

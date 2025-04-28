@@ -5,10 +5,11 @@ import { appwriteConfig } from '../lib/appwriteConfig';
 import { Permission, Role } from 'appwrite'; // Add Permission and Role
 
 const Account = () => {
-  const { user, accountDetails, likedVideoIds, dislikedVideoIds, account, updateUserProfile, logout } = useAuth(); // Get user, account obj, update function, and logout
+  // *** Get liked/disliked sets from context ***
+  const { user, accountDetails, likedVideoIds, dislikedVideoIds, account, refreshUserProfile, logout } = useAuth(); // Renamed updateUserProfile -> refreshUserProfile in context
   const [name, setName] = useState('');
   const [bio, setBio] = useState(''); // Renamed from description to bio
-  const [profileImageUrl, setProfileImageUrl] = useState(''); // Add state for profile image URL
+  const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -17,9 +18,9 @@ const Account = () => {
   useEffect(() => {
     if (user) {
       setName(user.name || '');
-      // Read directly from user object properties populated by context
-      setBio(user.bio || ''); // Use user.bio
-      setProfileImageUrl(user.profileImageUrl || ''); // Use user.profileImageUrl
+      // *** Use accountDetails from context for initial state ***
+      setBio(accountDetails.bio || '');
+      setProfileImageUrl(accountDetails.profileImageUrl || '');
     }
   }, [user]); // Re-run effect if user object changes
 
@@ -51,10 +52,10 @@ const Account = () => {
           name: name, // Always include the current name state
           bio: bio,
           profileImageUrl: profileImageUrl,
-          subscribingTo: accountDetails?.subscribingTo || [], // Use context value or default
           // --- Use Sets from context for like/dislike arrays ---
           videosLiked: Array.from(likedVideoIds),    // Use Set from context
           videosDisliked: Array.from(dislikedVideoIds) // Use Set from context
+          // *** DO NOT include videosUploaded here ***
         };
         
         try {
@@ -73,7 +74,10 @@ const Account = () => {
                 appwriteConfig.databaseId,
                 appwriteConfig.accountsCollectionId,
                 user.$id, // Use user's ID as document ID
-                accountDataPayload, // Use the combined payload
+                { // *** When creating, include videosUploaded explicitly ***
+                  ...accountDataPayload,
+                  videosUploaded: [] // Initialize empty array
+                },
                 [
                   Permission.read(Role.user(user.$id)),   // User can read their own doc
                   Permission.update(Role.user(user.$id)), // User can update their own doc
@@ -93,7 +97,7 @@ const Account = () => {
       }
 
       // Refresh the user state in the context to reflect changes
-      await updateUserProfile();
+      await refreshUserProfile(); // Use the renamed context function
 
       if (nameUpdated || detailsUpdated) {
           setSuccess('Account updated successfully!');

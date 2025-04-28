@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
       bio: '',
       profileImageUrl: null,
       subscribingTo: [],
-      videosUploaded: [] // Add array for tracking uploaded videos
+      videosUploaded: [] // Ensure this state exists
   });
   const [likedVideoIds, setLikedVideoIds] = useState(new Set());
   const [dislikedVideoIds, setDislikedVideoIds] = useState(new Set());
@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }) => {
         // --- Get arrays directly from accountDoc ---
         accountVideosLiked = accountDoc?.videosLiked || [];
         accountVideosDisliked = accountDoc?.videosDisliked || [];
+        // --- Fetch videosUploaded ---
         const accountVideosUploaded = accountDoc?.videosUploaded || [];
         console.log(`[AuthContext] Fetched account arrays: Liked(${accountVideosLiked.length}), Disliked(${accountVideosDisliked.length}), Uploaded(${accountVideosUploaded.length})`);
 
@@ -73,8 +74,8 @@ export const AuthProvider = ({ children }) => {
     return {
         bio: accountDoc?.bio || '', // Default if doc or field is missing
         profileImageUrl: accountDoc?.profileImageUrl || null,
-        subscribingTo: subscribedToChannelIds, // Use the securely stored subscriptions list
-        videosUploaded: accountDoc?.videosUploaded || [], // Add uploaded videos array
+        subscribingTo: subscribedToChannelIds,
+        videosUploaded: accountDoc?.videosUploaded || [],
         // --- Return the arrays fetched from account ---
         initialLikedIds: accountVideosLiked,
         initialDislikedIds: accountVideosDisliked
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
             bio: userData.bio,
             profileImageUrl: userData.profileImageUrl,
             subscribingTo: userData.subscribingTo,
-            videosUploaded: userData.videosUploaded || [] // Initialize videos uploaded array
+            videosUploaded: userData.videosUploaded || []
         });
         // --- Initialize Sets directly from the fetched account arrays ---
         setLikedVideoIds(new Set(userData.initialLikedIds));
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }) => {
             console.error("Error checking user status:", error);
         }
         setUser(null);
-        setAccountDetails({ bio: '', profileImageUrl: null, subscribingTo: [], videosUploaded: [] }); // Reset details
+        setAccountDetails({ bio: '', profileImageUrl: null, subscribingTo: [], videosUploaded: [] }); // Reset details including videosUploaded
         setLikedVideoIds(new Set()); // Reset sets
         setDislikedVideoIds(new Set());
     } finally {
@@ -136,9 +137,9 @@ export const AuthProvider = ({ children }) => {
               name: name,
               bio: '',
               profileImageUrl: null,
-              videosLiked: [], // Add required empty array
-              videosDisliked: [], // Add required empty array
-              videosUploaded: [] // Add empty array for tracking uploaded videos
+              videosLiked: [],
+              videosDisliked: [],
+              videosUploaded: []
             },
             [ // Permissions
               Permission.read(Role.user(userId)),
@@ -195,6 +196,7 @@ export const AuthProvider = ({ children }) => {
   // Logout user
   const logout = async () => {
     try {
+      // Reset states on logout
       await account.deleteSession('current');
       setUser(null);
       navigate('/sign-in');
@@ -219,7 +221,7 @@ export const AuthProvider = ({ children }) => {
       setAccountDetails({ // Update details separately
           bio: userData.bio,
           profileImageUrl: userData.profileImageUrl,
-          subscribingTo: userData.subscribingTo,
+          subscribingTo: userData.subscribingTo || [],
           videosUploaded: userData.videosUploaded || []
       });
       // Ensure liked/disliked Sets are also updated from the fresh fetch

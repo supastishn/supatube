@@ -37,6 +37,8 @@ const Home = () => {
               profileImageUrl: null,           // Default null image URL
               videosLiked: [],                 // Required empty array
               videosDisliked: [],              // Required empty array
+              videosUploaded: [],              // Include required empty array
+              watchLaterVideos: [],            // Include required empty array
               subscribingTo: []                // Required empty array
             };
             await databases.createDocument(

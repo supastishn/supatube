@@ -93,7 +93,7 @@ const WatchLater = () => {
               thumbnailUrl = storage.getFilePreview(
                 appwriteConfig.storageVideosBucketId,
                 doc.thumbnail_id
-              ).href;
+              ); // Get the URL object
             } catch (previewError) {
               console.error(`[WatchLaterThumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
             }

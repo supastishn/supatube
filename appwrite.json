@@ -238,6 +238,25 @@
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/video-deletion-manager"
+        },
+        {
+            "$id": "view-manager",
+            "execute": [],
+            "name": "view-manager",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "documents.read",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "0 */6 * * *",
+            "timeout": 120,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/view-manager"
         }
     ],
     "databases": [

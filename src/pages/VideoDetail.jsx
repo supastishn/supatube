@@ -1,3 +1,5 @@
+// --- View System Integration ---
+import { recordViewInteraction } from '../lib/viewService'; // Add this
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import VideoCard from '../components/VideoCard'; // Assuming VideoCard component
@@ -83,6 +85,9 @@ const VideoDetail = () => {
   const [loadingSubCount, setLoadingSubCount] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  // --- View System ---
+  const [hasRecordedView, setHasRecordedView] = useState(false); // Add state for view recording
+  const VIEW_THRESHOLD_SECONDS = 10; // Record view after 10 seconds
   
   // Handle like/dislike button clicks
   const handleLikeDislike = useCallback(async (action) => {
@@ -223,6 +228,49 @@ const VideoDetail = () => {
   // Debug log to verify the function exists before rendering
   console.log('Is handleLikeDislike defined before render?', typeof handleLikeDislike);
 
+  // --- Effect to record view ---
+  useEffect(() => {
+    let viewRecordTimeout;
+
+    const handlePlay = () => {
+      // Only set timeout if user is logged in and view not recorded yet for this load
+      if (currentUser && !hasRecordedView) {
+        viewRecordTimeout = setTimeout(() => {
+          console.log(`[VideoDetail] Played past ${VIEW_THRESHOLD_SECONDS}s threshold. Recording view.`);
+          recordViewInteraction(videoId, currentUser.$id);
+          setHasRecordedView(true); // Mark as recorded for this session
+        }, VIEW_THRESHOLD_SECONDS * 1000);
+      }
+    };
+
+    const handlePauseOrEnd = () => {
+      // Clear timeout if video is paused or ends before threshold
+      clearTimeout(viewRecordTimeout);
+    };
+
+    // Find the video element after it's potentially rendered
+    // Note: This relies on the video element being present in the DOM.
+    // If the video player component mounts/unmounts differently, adjust this logic.
+    const videoElement = document.querySelector('.video-player'); // Use the class from JSX
+
+    if (videoElement) {
+      videoElement.addEventListener('play', handlePlay);
+      videoElement.addEventListener('pause', handlePauseOrEnd);
+      videoElement.addEventListener('ended', handlePauseOrEnd);
+    }
+
+    // Cleanup function
+    return () => {
+      clearTimeout(viewRecordTimeout);
+      if (videoElement) {
+        videoElement.removeEventListener('play', handlePlay);
+        videoElement.removeEventListener('pause', handlePauseOrEnd);
+        videoElement.removeEventListener('ended', handlePauseOrEnd);
+      }
+    };
+    // Depend on videoId and currentUser to reset if they change. hasRecordedView prevents re-triggering.
+  }, [videoId, currentUser, hasRecordedView]);
+
   useEffect(() => {
     const fetchVideoData = async () => {
       // Reset all states related to the video
@@ -236,6 +284,7 @@ const VideoDetail = () => {
       setDislikeCount(0);
       setUserLikeStatus(null); // Reset user status on new video load
       setShowFullBio(false);
+      setHasRecordedView(false); // Reset view recording status for new video load
 
       try {
         // --- Fetch Video Document from Appwrite ---
@@ -513,13 +562,15 @@ const VideoDetail = () => {
         );
         setLikeCount(countsDoc.likeCount || 0);
         setDislikeCount(countsDoc.dislikeCount || 0);
+        setVideo(prevVideo => prevVideo ? ({ ...prevVideo, viewCount: countsDoc.viewCount || 0 }) : null); // Update video state with view count
         setVideoCommentCount(countsDoc.commentCount || 0); // Ensure this line is present
         console.log(`[Counts Effect] Fetched counts for ${videoId}:`, countsDoc);
       } catch (err) {
         if (err.code === 404) {
-          // Video has no counts document yet (no likes/dislikes/comments)
+          // Video has no counts document yet (no likes/dislikes/comments/views)
           setLikeCount(0);
           setDislikeCount(0);
+          setVideo(prevVideo => prevVideo ? ({ ...prevVideo, viewCount: 0 }) : null); // Set view count to 0
           setVideoCommentCount(0); // Ensure this is set to 0 on 404
           console.log(`[Counts Effect] Counts doc 404 for ${videoId}, defaulting to 0.`);
         } else {
@@ -527,6 +578,7 @@ const VideoDetail = () => {
           // Optionally set an error state specific to counts
           setLikeCount(0); // Default to 0 on error too
           setDislikeCount(0);
+          setVideo(prevVideo => prevVideo ? ({ ...prevVideo, viewCount: 0 }) : null); // Set view count to 0 on error
           setVideoCommentCount(0); // Ensure this is set to 0 on error
         }
       } finally {
@@ -736,7 +788,7 @@ const VideoDetail = () => {
           <div className="video-stats-actions">
             {/* Views and Date */}
             <div className="video-views">
-              {formatViews(video.viewCount)} views • {formatTimeAgo(video.uploadedAt)}
+              {loadingCounts ? '...' : formatViews(video.viewCount || 0)} views • {formatTimeAgo(video.uploadedAt)}
             </div>
             {/* --- Updated Action Buttons --- */}
             <div className="video-actions">

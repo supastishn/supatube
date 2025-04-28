@@ -84,7 +84,6 @@ const Home = () => {
             // --- Extract Creator ID from Permissions ---
             let creatorId = null;
             const permissions = doc.$permissions || [];
-            console.log(`[Home/${doc.$id}] Permissions:`, permissions); // Log permissions
             const deletePermissionRegex = /^delete\("user:(.+)"\)$/;
 
             for (const perm of permissions) {
@@ -94,7 +93,6 @@ const Home = () => {
                   break;
               }
             }
-            console.log(`[Home/${doc.$id}] Extracted Creator ID:`, creatorId); // Log extracted ID
             // Fallback to denormalized attribute if needed
             if (!creatorId && doc.creatorId) {
                creatorId = doc.creatorId;
@@ -108,86 +106,74 @@ const Home = () => {
 
             // --- Fetch Creator Details if ID exists ---
             if (creatorId) {
-                console.log(`[Home/${doc.$id}] Attempting to fetch account details from DB for creatorId: ${creatorId}`);
-                // --- PRIMARY: Fetch account details (name, bio, profileImageUrl) from 'accounts' collection ---
                 try {
                    const accountDetailsDoc = await databases.getDocument(
                      appwriteConfig.databaseId,
                      appwriteConfig.accountsCollectionId,
                      creatorId
                    );
-                   console.log(`[Home/${doc.$id}] Fetched account details document:`, accountDetailsDoc);
-                   channelName = accountDetailsDoc.name || channelName; // Prioritize name from DB doc
-                   channelBio = accountDetailsDoc.bio || ''; // Get bio
-                   // Use DB profile image URL if available and no video-specific denormalized one exists
+                   channelName = accountDetailsDoc.name || channelName;
+                   channelBio = accountDetailsDoc.bio || '';
                    if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
                        channelAvatarUrl = accountDetailsDoc.profileImageUrl;
-                       console.log(`[Home/${doc.$id}] Using profile image URL from accounts collection: ${channelAvatarUrl}`);
                    }
-                   console.log(`[Home/${doc.$id}] Channel name set from DB doc: '${channelName}'`);
-
                 } catch (detailsError) {
                    if (detailsError.code === 404) {
-                     console.warn(`[Home/${doc.$id}] No account details document found for creator ${creatorId}. Falling back.`);
-                     // FALLBACK: Try fetching the core Appwrite account name if DB doc fails
                      try {
                        const creatorAccount = await account.get(creatorId);
                        creatorAccountNameFallback = creatorAccount.name;
-                       channelName = creatorAccountNameFallback || channelName; // Use core account name as fallback
-                       console.log(`[Home/${doc.$id}] Channel name set from account.get fallback: '${channelName}'`);
-                     } catch (accountGetError) {
-                       console.warn(`[Home/${doc.$id}] Could not fetch core account details for creator ${creatorId}:`, accountGetError);
-                     }
-                   } else {
-                     console.warn(`[Home/${doc.$id}] Error fetching account details document for creator ${creatorId}:`, detailsError);
-                    }
+                       channelName = creatorAccountNameFallback || channelName;
+                     } catch {}
+                   }
                 }
             }
 
             // --- Final Avatar Fallback Logic ---
             if (!channelAvatarUrl) {
                 channelAvatarUrl = creatorId
-                    ? avatars.getInitials(creatorId).href // Initials from ID first
-                    : avatars.getInitials(channelName || '?').href; // Then from name, then '?'
+                    ? avatars.getInitials(creatorId).href
+                    : avatars.getInitials(channelName || '?').href;
             }
 
             // --- Generate Thumbnail URL using thumbnail_id ---
-            let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail'; // Default fallback
-            console.log(`[Thumb/${doc.$id}] Checking doc.thumbnail_id:`, doc.thumbnail_id); // Log the ID attribute
-            if (doc.thumbnail_id) { // Check if the thumbnail file ID exists
+            let thumbnailUrl = 'https://via.placeholder.com/320x180/CCCCCC/969696?text=No+Thumbnail';
+            if (doc.thumbnail_id) {
                 try {
                     thumbnailUrl = storage.getFilePreview(
-                        appwriteConfig.storageVideosBucketId, // The bucket where thumbnails are stored
-                        doc.thumbnail_id                    // The attribute holding the thumbnail's File ID
-                    ); // Get the URL string
-                    //print(doc.thumbnail_id)
-                } catch (previewError) {
-                    console.error(`[Thumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
+                        appwriteConfig.storageVideosBucketId,
+                        doc.thumbnail_id
+                    );
+                } catch {}
+            }
+
+            // --- Fetch View Count ---
+            let viewCount = 0;
+            try {
+                const countsDoc = await databases.getDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.videoCountsCollectionId,
+                    doc.$id
+                );
+                viewCount = countsDoc.viewCount || 0;
+            } catch (countsError) {
+                if (countsError.code !== 404) {
+                    console.warn(`[Home/${doc.$id}] Error fetching view counts:`, countsError);
                 }
             }
-            console.log(`[Thumb/${doc.$id}] Final thumbnailUrl used:`, thumbnailUrl); // Log the final URL
-
-            console.log(`[Home/${doc.$id}] Final Channel Data for Card:`, { 
-                id: creatorId || doc.channelId || `channel-${doc.$id}`, 
-                name: channelName, 
-                profileImageUrl: channelAvatarUrl, 
-                creatorUserId: creatorId,
-                bio: channelBio // Add bio
-            }); // Log final data
             
             return {
                 id: doc.$id,
-                title: doc.title || 'Untitled Video', // Provide fallback
-                thumbnailUrl: thumbnailUrl, // Use the generated or fallback URL
-                durationSeconds: doc.video_duration || 0, // Use video_duration attribute
-                viewCount: doc.viewCount || 0, // Provide fallback
-                uploadedAt: doc.$createdAt, // Use Appwrite's built-in timestamp
+                title: doc.title || 'Untitled Video',
+                thumbnailUrl: thumbnailUrl,
+                durationSeconds: doc.video_duration || 0,
+                viewCount: viewCount,
+                uploadedAt: doc.$createdAt,
                 channel: {
-                    id: creatorId || doc.channelId || `channel-${doc.$id}`, // Use creatorId if available
-                    name: channelName, // Use potentially fetched name
-                    profileImageUrl: channelAvatarUrl, // Use determined avatar URL
-                    bio: channelBio, // Add bio here
-                    creatorUserId: creatorId // Pass the creator user ID explicitly
+                    id: creatorId || doc.channelId || `channel-${doc.$id}`,
+                    name: channelName,
+                    profileImageUrl: channelAvatarUrl,
+                    bio: channelBio,
+                    creatorUserId: creatorId
                 }
             };
         }));

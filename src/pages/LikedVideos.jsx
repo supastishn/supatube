@@ -74,9 +74,7 @@ const LikedVideos = () => {
                  try { // Fallback to account.get() name
                    const creatorAccount = await account.get(creatorId);
                    channelName = creatorAccount.name || channelName;
-                 } catch (accountGetError) { /* Ignore fallback error */ }
-              } else {
-                console.warn(`Error fetching account details for ${creatorId}:`, detailsError);
+                 } catch {}
               }
             }
           }
@@ -96,9 +94,22 @@ const LikedVideos = () => {
                 appwriteConfig.storageVideosBucketId,
                 doc.thumbnail_id
               ).href;
-            } catch (previewError) {
-              console.error(`Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
-            }
+            } catch {}
+          }
+
+          // --- Fetch View Count ---
+          let viewCount = 0;
+          try {
+              const countsDoc = await databases.getDocument(
+                  appwriteConfig.databaseId,
+                  appwriteConfig.videoCountsCollectionId,
+                  doc.$id
+              );
+              viewCount = countsDoc.viewCount || 0;
+          } catch (countsError) {
+              if (countsError.code !== 404) {
+                  console.warn(`[LikedVideos/${doc.$id}] Error fetching view counts:`, countsError);
+              }
           }
 
           return {
@@ -106,7 +117,7 @@ const LikedVideos = () => {
             title: doc.title || 'Untitled Video',
             thumbnailUrl: thumbnailUrl,
             durationSeconds: doc.video_duration || 0,
-            viewCount: doc.viewCount || 0,
+            viewCount: viewCount,
             uploadedAt: doc.$createdAt,
             channel: {
               id: creatorId || `channel-${doc.$id}`,

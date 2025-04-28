@@ -60,12 +60,29 @@ const Profile = () => {
             appwriteConfig.databaseId,
             appwriteConfig.videosCollectionId,
             [
-              Query.equal('$id', uploadedVideoIds), // *** Fetch by specific IDs ***
-              Query.limit(uploadedVideoIds.length), // Limit to the number of IDs
-              Query.orderDesc('$createdAt'),   // Show newest videos first
+              Query.equal('$id', uploadedVideoIds),
+              Query.limit(uploadedVideoIds.length),
+              Query.orderDesc('$createdAt'),
             ]
           );
-          setUserVideos(videoResponse.documents); // Set the fetched videos
+          // Fetch view counts for each video
+          const videosWithCounts = await Promise.all(videoResponse.documents.map(async (videoDoc) => {
+            let viewCount = 0;
+            try {
+              const countsDoc = await databases.getDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.videoCountsCollectionId,
+                videoDoc.$id
+              );
+              viewCount = countsDoc.viewCount || 0;
+            } catch (countsError) {
+              if (countsError.code !== 404) {
+                console.warn(`[Profile/${videoDoc.$id}] Error fetching view counts:`, countsError);
+              }
+            }
+            return { ...videoDoc, fetchedViewCount: viewCount };
+          }));
+          setUserVideos(videosWithCounts); // Set videos including the counts
         } else {
           setUserVideos([]); // Ensure it's empty if no IDs
         }
@@ -223,7 +240,7 @@ const Profile = () => {
                       storage.getFilePreview(appwriteConfig.storageVideosBucketId, video.thumbnail_id) : 
                       'https://via.placeholder.com/320x180?text=No+Thumbnail',
                     durationSeconds: video.video_duration || 0,
-                    viewCount: video.viewCount || 0,
+                    viewCount: video.fetchedViewCount || 0,
                     uploadedAt: video.$createdAt,
                     channel: {
                       id: userId,

@@ -62,6 +62,7 @@ const VideoCard = ({ video, isRelated = false }) => {
     uploadedAt,
     channel
   } = video || defaultVideo;
+  const viewCount = video?.viewCount ?? defaultVideo.viewCount; // Get viewCount safely
 
   const {
       id: channelId, // Rename to avoid conflict with video id
@@ -111,7 +112,7 @@ const VideoCard = ({ video, isRelated = false }) => {
             {name || 'Unknown Channel'}
           </Link>
           <div className="video-stats">
-            <span>{formatViews(viewCount)} views</span>
+            <span>{formatViews(viewCount || 0)} views</span>
             <span className="dot">•</span>
             <span>{formatTimeAgo(uploadedAt)}</span>
           </div>

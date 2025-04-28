@@ -68,21 +68,21 @@ const SearchResults = () => {
                 channelName = creatorAccount.name || channelName;
 
                 // --- Fetch account details (bio, profileImageUrl) from 'accounts' collection ---
-                 try {
-                    const accountDetailsDoc = await databases.getDocument(
-                        appwriteConfig.databaseId,
-                        appwriteConfig.accountsCollectionId,
-                        creatorId
-                    );
-                    if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
-                        channelAvatarUrl = accountDetailsDoc.profileImageUrl;
-                    }
-                    channelBio = accountDetailsDoc.bio || '';
-                 } catch (detailsError) {
-                    if (detailsError.code !== 404) console.warn(`[Search/${doc.$id}] Could not fetch account details for creator ${creatorId}:`, detailsError);
+                try {
+                  const accountDetailsDoc = await databases.getDocument(
+                      appwriteConfig.databaseId,
+                      appwriteConfig.accountsCollectionId,
+                      creatorId
+                  );
+                  if (accountDetailsDoc.profileImageUrl && !channelAvatarUrl) {
+                      channelAvatarUrl = accountDetailsDoc.profileImageUrl;
+                  }
+                  channelBio = accountDetailsDoc.bio || '';
+                } catch (detailsError) {
+                  if (detailsError.code !== 404) console.warn(`[Search/${doc.$id}] Could not fetch account details for creator ${creatorId}:`, detailsError);
                 }
               } catch (userFetchError) {
-                console.warn(`[Search/${doc.$id}] Could not fetch details for creator ${creatorId}:`, userFetchError);
+                // ignore
               }
             }
 
@@ -100,9 +100,22 @@ const SearchResults = () => {
                 thumbnailUrl = storage.getFilePreview(
                   appwriteConfig.storageVideosBucketId,
                   doc.thumbnail_id
-                ).href; // Get the URL string directly
-              } catch (previewError) {
-                console.error(`[SearchThumb/${doc.$id}] Error generating thumbnail preview URL:`, previewError);
+                ).href;
+              } catch {}
+            }
+
+            // --- Fetch View Count ---
+            let viewCount = 0;
+            try {
+              const countsDoc = await databases.getDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.videoCountsCollectionId,
+                doc.$id
+              );
+              viewCount = countsDoc.viewCount || 0;
+            } catch (countsError) {
+              if (countsError.code !== 404) {
+                console.warn(`[SearchResults/${doc.$id}] Error fetching view counts:`, countsError);
               }
             }
 
@@ -112,14 +125,14 @@ const SearchResults = () => {
               title: doc.title || 'Untitled Video',
               thumbnailUrl: thumbnailUrl,
               durationSeconds: doc.durationSeconds || 0,
-              viewCount: doc.viewCount || 0,
+              viewCount: viewCount,
               uploadedAt: doc.$createdAt,
               channel: {
                 id: creatorId || doc.channelId || `channel-${doc.$id}`,
                 name: channelName,
                 profileImageUrl: channelAvatarUrl,
-                bio: channelBio, // Add bio
-                creatorUserId: creatorId // Pass the creator user ID explicitly
+                bio: channelBio,
+                creatorUserId: creatorId
               }
             };
           }));

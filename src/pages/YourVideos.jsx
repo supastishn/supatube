@@ -96,18 +96,31 @@ const YourVideos = () => {
                     appwriteConfig.storageVideosBucketId,
                     doc.thumbnail_id
                   ).href;
-                } catch (previewError) {
-                  console.error(`[YourVideos] Error generating thumbnail preview URL for ${doc.$id}:`, previewError);
-                }
+                } catch {}
               }
               
+              // --- Fetch View Count ---
+              let viewCount = 0;
+              try {
+                  const countsDoc = await databases.getDocument(
+                      appwriteConfig.databaseId,
+                      appwriteConfig.videoCountsCollectionId,
+                      doc.$id
+                  );
+                  viewCount = countsDoc.viewCount || 0;
+              } catch (countsError) {
+                  if (countsError.code !== 404) {
+                      console.warn(`[YourVideos/${doc.$id}] Error fetching view counts:`, countsError);
+                  }
+              }
+
               // Return formatted video object for VideoCard
               return {
                 id: doc.$id,
                 title: doc.title || 'Untitled Video',
                 thumbnailUrl: thumbnailUrl,
                 durationSeconds: doc.video_duration || 0,
-                viewCount: doc.viewCount || 0,
+                viewCount: viewCount,
                 uploadedAt: doc.$createdAt,
                 channel: {
                   id: currentUser.$id,

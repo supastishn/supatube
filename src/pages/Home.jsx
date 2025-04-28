@@ -179,7 +179,7 @@ const Home = () => {
                 id: doc.$id,
                 title: doc.title || 'Untitled Video', // Provide fallback
                 thumbnailUrl: thumbnailUrl, // Use the generated or fallback URL
-                durationSeconds: doc.durationSeconds || 0, // Provide fallback
+                durationSeconds: doc.video_duration || 0, // Use video_duration attribute
                 viewCount: doc.viewCount || 0, // Provide fallback
                 uploadedAt: doc.$createdAt, // Use Appwrite's built-in timestamp
                 channel: {

@@ -629,6 +629,14 @@
                     "array": true,
                     "size": 100,
                     "default": null
+                },
+                {
+                    "key": "watchLaterVideos",
+                    "type": "string",
+                    "required": true,
+                    "array": true,
+                    "size": 100,
+                    "default": null
                 }
             ],
             "indexes": []

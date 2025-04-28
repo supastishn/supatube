@@ -2,6 +2,7 @@
   "name": "react-appwrite-youtube-clone",
   "private": true,
   "version": "0.0.1",
+  "homepage": "https://supastishn.github.io.supatube",
   "type": "module",
   "scripts": {
     "dev": "vite",

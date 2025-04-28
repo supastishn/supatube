@@ -38,8 +38,7 @@ const Home = () => {
               videosLiked: [],                 // Required empty array
               videosDisliked: [],              // Required empty array
               videosUploaded: [],              // Include required empty array
-              watchLaterVideos: [],            // Include required empty array
-              subscribingTo: []                // Required empty array
+              watchLaterVideos: []             // Include required empty array
             };
             await databases.createDocument(
               appwriteConfig.databaseId,
